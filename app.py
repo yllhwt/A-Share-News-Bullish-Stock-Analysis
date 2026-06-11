@@ -107,28 +107,9 @@ if "results" not in st.session_state:
 if "invite_handled" not in st.session_state:
     st.session_state.invite_handled = False
 
-# 浏览器指纹：简单的 localStorage hash，防清 cookie
-fp = st.query_params.get("fp", "")
-if fp:
-    user_key = fp
-    st.session_state._client_id = fp
-else:
-    user_key = st.session_state._client_id
-    # 注入 JS：存指纹到 localStorage，跳转回带 fp
-    st.components.v1.html("""
-    <script>
-    (function(){
-        var k='_fp2',s=localStorage.getItem(k);
-        if(!s){var r=[screen.width,screen.height,screen.colorDepth,navigator.language,navigator.platform,Intl.DateTimeFormat().resolvedOptions().timeZone].join('|');
-        var h=0;for(var i=0;i<r.length;i++){h=((h<<5)-h)+r.charCodeAt(i);h|=0;}
-        s='b'+Math.abs(h).toString(36);localStorage.setItem(k,s);}
-        if(location.search.indexOf('fp=')===-1){
-            var p=location.search?location.search.substring(1).split('&').filter(function(x){return x.indexOf('fp=')!==0}).join('&'):'';
-            location.href=location.pathname+'?fp='+s+(p?'&'+p:'');
-        }
-    })();
-    </script>
-    """, height=0)
+# 用户标识 + 额度
+user_key = st.session_state._client_id
+
 # VIP：管理员自动无限
 admin_on = st.query_params.get("admin", "") == ADMIN_PASSWORD
 if admin_on:
@@ -137,8 +118,7 @@ else:
     quota = get_quota(user_key)
 
 # 邀请链接
-code = create_invite_code(user_key)
-invite_link = get_my_invite_link(code, st.query_params.get("_url", "https://stock-news.streamlit.app"))
+invite_link = "分享功能开发中"
 
 # ═══════════════════════════════════════════════════
 # 侧边栏
