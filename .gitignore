@@ -1,0 +1,7 @@
+.env
+quota.db
+__pycache__/
+*.pyc
+*.pyo
+output/
+*.db
