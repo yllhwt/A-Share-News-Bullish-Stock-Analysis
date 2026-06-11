@@ -22,7 +22,7 @@ from analyzer import analyze_multiple, calc_tokens, analyze_news
 from quota import (
     get_quota, use_one, create_invite_code, claim_invite_code,
     get_my_invite_link, record_ad_view, FREE_LIFETIME, INVITE_BONUS, AD_BONUS,
-    record_api_usage, get_daily_cost, get_admin_stats,
+    record_api_usage, get_daily_cost, get_admin_stats, reset_all_quota,
 )
 
 TZ_BEIJING = timezone(timedelta(hours=8))
@@ -411,7 +411,29 @@ if admin_param == ADMIN_PASSWORD:
     df = pd.DataFrame(days)
     st.bar_chart(df.set_index("日期")[["消费(元)", "用户"]])
 
-    st.caption(f"管理员入口: {st.query_params.get('admin','')} → 关闭标签页即退出后台")
+    # 重置按钮
+    st.divider()
+    st.subheader("🛠 管理操作")
+    col_a, col_b = st.columns([1, 3])
+    with col_a:
+        if st.button("♻ 重置所有人次数", type="secondary", use_container_width=True):
+            st.session_state._confirm_reset = True
+
+    if st.session_state.get("_confirm_reset"):
+        st.warning("确认要给所有用户重置免费次数吗？")
+        c1, c2 = st.columns(2)
+        with c1:
+            if st.button("✅ 确认重置", type="primary"):
+                n = reset_all_quota()
+                st.success(f"已重置 {n} 个用户的免费次数")
+                st.session_state._confirm_reset = False
+                st.rerun()
+        with c2:
+            if st.button("取消"):
+                st.session_state._confirm_reset = False
+                st.rerun()
+
+    st.caption(f"管理员入口: 关闭标签页即退出后台")
 
 # ═══════════════════════════════════════════════════
 # 底部

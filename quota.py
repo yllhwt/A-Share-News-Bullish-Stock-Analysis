@@ -493,6 +493,20 @@ def set_cached_news(news_list: list):
 
 
 # ═══════════════════════════════════════════════════
+# 管理员操作
+# ═══════════════════════════════════════════════════
+
+def reset_all_quota():
+    """重置所有用户的免费次数（used 归零，bonus 保留）"""
+    conn = _db()
+    conn.execute("UPDATE ip_quota SET used = 0")
+    count = conn.total_changes
+    conn.commit()
+    conn.close()
+    return count
+
+
+# ═══════════════════════════════════════════════════
 # 初始化
 # ═══════════════════════════════════════════════════
 
