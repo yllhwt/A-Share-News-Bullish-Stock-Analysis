@@ -30,8 +30,43 @@ TZ_BEIJING = timezone(timedelta(hours=8))
 st.set_page_config(
     page_title="A股利好新闻分析",
     page_icon="📰",
-    layout="wide",
+    layout="centered",          # 手机用居中布局
+    initial_sidebar_state="collapsed",  # 默认折叠侧边栏
 )
+
+# 手机端自适应 CSS
+st.markdown("""
+<style>
+/* 全局 */
+@media (max-width: 768px) {
+    .stApp { padding: 0.5rem !important; }
+    h1 { font-size: 1.3rem !important; }
+    h2 { font-size: 1.1rem !important; }
+    h3 { font-size: 1rem !important; }
+    .stMarkdown table { font-size: 0.8rem !important; display: block; overflow-x: auto; }
+    .stMetric { font-size: 0.9rem !important; }
+    .stButton button { width: 100% !important; padding: 0.7rem !important; font-size: 1rem !important; }
+    .stCheckbox label { font-size: 0.85rem !important; }
+    .stCaption { font-size: 0.75rem !important; }
+}
+
+/* 表格横向滚动 */
+.stMarkdown table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+    max-width: 100%;
+}
+
+/* 按钮全宽 */
+div[data-testid="column"] .stButton button {
+    width: 100%;
+}
+
+/* 侧边栏更友好 */
+[data-testid="stSidebar"] { min-width: 280px !important; }
+</style>
+""", unsafe_allow_html=True)
 
 # ═══════════════════════════════════════════════════
 # 辅助：获取客户端 IP（Streamlit 限制，用 session ID 代替）
