@@ -317,6 +317,71 @@ def get_admin_stats(date_str: str = None) -> dict:
 
 
 # ═══════════════════════════════════════════════════
+# 分析结果缓存（同新闻不重复调 API）
+# ═══════════════════════════════════════════════════
+
+def _ensure_cache_table(conn):
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS analysis_cache (
+            cache_key TEXT PRIMARY KEY,
+            news_title TEXT NOT NULL,
+            news_source TEXT NOT NULL,
+            analysis TEXT NOT NULL,
+            tokens_in INTEGER DEFAULT 0,
+            tokens_out INTEGER DEFAULT 0,
+            hit_count INTEGER DEFAULT 1,
+            created_at TEXT NOT NULL,
+            last_hit TEXT NOT NULL
+        )
+    """)
+    conn.commit()
+
+
+def get_cached_analysis(title: str, source: str) -> dict | None:
+    """查缓存，命中返回结果并更新计数，未命中返回 None"""
+    key = hashlib.md5(f"{source}|{title}".encode()).hexdigest()
+    conn = _db()
+    _ensure_cache_table(conn)
+    row = conn.execute(
+        "SELECT analysis, tokens_in, tokens_out, hit_count FROM analysis_cache WHERE cache_key=?",
+        (key,)
+    ).fetchone()
+    if row:
+        conn.execute(
+            "UPDATE analysis_cache SET hit_count=hit_count+1, last_hit=? WHERE cache_key=?",
+            (datetime.now(TZ_BEIJING).isoformat(), key)
+        )
+        conn.commit()
+        conn.close()
+        return {
+            "analysis": row["analysis"],
+            "tokens_in": row["tokens_in"],
+            "tokens_out": row["tokens_out"],
+            "hit_count": row["hit_count"] + 1,
+            "cached": True,
+        }
+    conn.close()
+    return None
+
+
+def set_cached_analysis(title: str, source: str, analysis: str,
+                        tokens_in: int, tokens_out: int):
+    """存入缓存"""
+    key = hashlib.md5(f"{source}|{title}".encode()).hexdigest()
+    now = datetime.now(TZ_BEIJING).isoformat()
+    conn = _db()
+    _ensure_cache_table(conn)
+    conn.execute(
+        "INSERT OR REPLACE INTO analysis_cache "
+        "(cache_key, news_title, news_source, analysis, tokens_in, tokens_out, created_at, last_hit) "
+        "VALUES (?,?,?,?,?,?,?,?)",
+        (key, title, source, analysis, tokens_in, tokens_out, now, now)
+    )
+    conn.commit()
+    conn.close()
+
+
+# ═══════════════════════════════════════════════════
 # 初始化
 # ═══════════════════════════════════════════════════
 
