@@ -107,47 +107,38 @@ if "results" not in st.session_state:
 if "invite_handled" not in st.session_state:
     st.session_state.invite_handled = False
 
-# 浏览器指纹：免费防清 cookie 薅羊毛
+# 浏览器指纹：简单的 localStorage hash，防清 cookie
 fp = st.query_params.get("fp", "")
 if fp:
     user_key = fp
-    st.session_state._client_id = fp  # 覆盖随机 ID
+    st.session_state._client_id = fp
 else:
     user_key = st.session_state._client_id
-    # 注入 JS：生成浏览器指纹，写入 localStorage，下次自动带上
+    # 注入 JS：存指纹到 localStorage，跳转回带 fp
     st.components.v1.html("""
     <script>
     (function(){
-        var key = '_fp';
-        var stored = localStorage.getItem(key);
-        if (!stored) {
-            var fp = navigator.hardwareConcurrency + '|' + navigator.deviceMemory + '|' +
-                     screen.colorDepth + '|' + screen.width + 'x' + screen.height + '|' +
-                     Intl.DateTimeFormat().resolvedOptions().timeZone + '|' +
-                     navigator.language + '|' + (!!window.chrome) + '|' +
-                     navigator.platform;
-            // 简单 hash
-            var hash = 0;
-            for (var i = 0; i < fp.length; i++) {
-                hash = ((hash << 5) - hash) + fp.charCodeAt(i);
-                hash |= 0;
-            }
-            stored = 'b' + Math.abs(hash).toString(36);
-            localStorage.setItem(key, stored);
-        }
-        if (!window.location.search.includes('fp=')) {
-            var sep = window.location.search ? '&' : '?';
-            window.location.search += sep + 'fp=' + stored;
+        var k='_fp2',s=localStorage.getItem(k);
+        if(!s){var r=[screen.width,screen.height,screen.colorDepth,navigator.language,navigator.platform,Intl.DateTimeFormat().resolvedOptions().timeZone].join('|');
+        var h=0;for(var i=0;i<r.length;i++){h=((h<<5)-h)+r.charCodeAt(i);h|=0;}
+        s='b'+Math.abs(h).toString(36);localStorage.setItem(k,s);}
+        if(location.search.indexOf('fp=')===-1){
+            var p=location.search?location.search.substring(1).split('&').filter(function(x){return x.indexOf('fp=')!==0}).join('&'):'';
+            location.href=location.pathname+'?fp='+s+(p?'&'+p:'');
         }
     })();
     </script>
     """, height=0)
-quota = get_quota(user_key)
+# VIP：管理员自动无限
+admin_on = st.query_params.get("admin", "") == ADMIN_PASSWORD
+if admin_on:
+    quota = {"total": 999, "used": 0, "bonus": 0, "free_base": 999, "remaining": 999, "can_use": True, "is_new": False, "is_vip": True}
+else:
+    quota = get_quota(user_key)
 
-# 邀请链接生成
+# 邀请链接
 code = create_invite_code(user_key)
-REMOTE_STREAMLIT_URL = "https://your-app-name.streamlit.app"
-invite_link = get_my_invite_link(code, REMOTE_STREAMLIT_URL)
+invite_link = get_my_invite_link(code, st.query_params.get("_url", "https://stock-news.streamlit.app"))
 
 # ═══════════════════════════════════════════════════
 # 侧边栏
@@ -158,6 +149,12 @@ with st.sidebar:
 
     use_ai_filter = st.checkbox("AI 预筛", value=True)
     max_news = st.slider("每源抓取条数", 10, 50, 30)
+
+    # VIP 提示 + 指纹
+    if quota.get("is_vip"):
+        st.success("👑 VIP 无限次数")
+    else:
+        st.caption(f"你的fp: `{user_key[:16]}`")
 
 
     # 处理邀请链接

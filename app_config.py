@@ -71,6 +71,11 @@ COMPLIANCE_MODE = False
 # 每日 API 消费上限（元），超过后拒绝所有分析请求
 DAILY_COST_LIMIT = 1.0
 
+# VIP 白名单（浏览器指纹，访问后从 URL ?fp=xxx 获取你的 fp 填入）
+VIP_FPS = [
+    # "b123abc",   # 你的指纹填这里
+]
+
 # 管理员密码（访问 ?admin=密码 查看后台）
 ADMIN_PASSWORD = "admin123"
 

@@ -10,6 +10,15 @@ import os
 import sqlite3
 import hashlib
 import secrets
+
+try:
+    from app_config import VIP_FPS
+except ImportError:
+    VIP_FPS = []
+
+
+def _is_vip(ip: str) -> bool:
+    return ip in VIP_FPS
 from datetime import datetime, timezone, timedelta
 
 TZ_BEIJING = timezone(timedelta(hours=8))
@@ -60,6 +69,12 @@ def init():
 
 def get_quota(ip: str) -> dict:
     """获取某 IP 的剩余额度"""
+    if _is_vip(ip):
+        return {
+            "total": 999, "used": 0, "bonus": 0, "free_base": 999,
+            "remaining": 999, "can_use": True, "is_new": False, "is_vip": True,
+        }
+
     conn = _db()
     row = conn.execute("SELECT bonus, used FROM ip_quota WHERE ip=?", (ip,)).fetchone()
     conn.close()
@@ -87,6 +102,8 @@ def get_quota(ip: str) -> dict:
 
 def use_one(ip: str) -> bool:
     """消耗一次额度，返回是否成功"""
+    if _is_vip(ip):
+        return True  # VIP 无限
     conn = _db()
 
     row = conn.execute("SELECT bonus, used FROM ip_quota WHERE ip=?", (ip,)).fetchone()
