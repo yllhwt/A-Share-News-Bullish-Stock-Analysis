@@ -27,7 +27,7 @@ DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "quota.db")
 # 配置
 FREE_LIFETIME = 3        # 新用户免费次数（有缓存成本极低）
 INVITE_BONUS = 3         # 邀请成功后双方各得次数
-AD_BONUS = 1             # 看一次广告获得次数
+AD_BONUS = 3             # 看一次广告获得次数
 
 def _db():
     conn = sqlite3.connect(DB_PATH)

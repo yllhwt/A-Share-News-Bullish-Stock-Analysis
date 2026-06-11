@@ -198,9 +198,7 @@ with st.sidebar:
 
             st.markdown("### 方式2: 看激励广告")
             if st.button(f"📺 观看广告 (+{AD_BONUS}次)", use_container_width=True):
-                bonus = record_ad_view(user_key)
-                st.success(f"观看完成！获得 +{bonus} 次额度")
-                st.rerun()
+                st.info("暂无广告，敬请期待")
 
     # --- 我的邀请统计 ---
     with st.expander("📊 我的邀请"):
