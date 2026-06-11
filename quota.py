@@ -375,6 +375,107 @@ def set_cached_analysis(title: str, source: str, analysis: str,
 
 
 # ═══════════════════════════════════════════════════
+# 新闻抓取缓存（盘前/盘中/盘后定时刷新，省 token）
+# ═══════════════════════════════════════════════════
+
+import json as _json
+
+# 刷新时间点（北京时间）
+REFRESH_TIMES = ["08:00", "09:15", "12:00", "12:30", "15:00", "17:00"]
+
+# 缓存保留天数
+NEWS_CACHE_DAYS = 2
+
+
+def _ensure_news_cache_table(conn):
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS news_cache (
+            date TEXT NOT NULL,
+            fetched_at TEXT NOT NULL,
+            news_json TEXT NOT NULL
+        )
+    """)
+    conn.commit()
+
+
+def get_cached_news(today: str) -> tuple[list | None, str]:
+    """
+    检查新闻缓存是否有效。返回 (新闻列表, 刷新时间)。
+    查找最近 NEWS_CACHE_DAYS 天内的最新缓存。
+    如果缓存已过期需要刷新，返回 (None, last_refresh_time)。
+    """
+    now = datetime.now(TZ_BEIJING)
+    current_time = now.strftime("%H:%M")
+
+    # 找到最近一个已过的刷新时间点
+    last_refresh = ""
+    for t in REFRESH_TIMES:
+        if current_time >= t:
+            last_refresh = t
+
+    conn = _db()
+    _ensure_news_cache_table(conn)
+
+    # 找最新一条缓存（可能跨天）
+    row = conn.execute(
+        "SELECT date, fetched_at, news_json FROM news_cache ORDER BY fetched_at DESC LIMIT 1"
+    ).fetchone()
+    conn.close()
+
+    if not row:
+        return None, last_refresh
+
+    cache_date = row["date"]
+    cached_time = row["fetched_at"][:16]  # "2026-06-12T08:05"
+
+    # 检查缓存日期是否在2天内
+    from datetime import timedelta as _td
+    cutoff = (now - _td(days=NEWS_CACHE_DAYS)).strftime("%Y-%m-%d")
+    if cache_date < cutoff:
+        return None, last_refresh
+
+    # 如果是今天的缓存，检查是否过了刷新点
+    if cache_date == today and last_refresh:
+        if cached_time < f"{today}T{last_refresh}":
+            # 缓存在上个刷新点之前，需要刷新
+            return None, last_refresh
+
+    # 缓存有效
+    return _json.loads(row["news_json"]), last_refresh
+
+
+def set_cached_news(news_list: list):
+    """写入新闻缓存，自动清理旧数据"""
+    today = datetime.now(TZ_BEIJING).strftime("%Y-%m-%d")
+    now = datetime.now(TZ_BEIJING).isoformat()
+    # 只缓存标题/来源等可序列化字段
+    serializable = [{
+        "id": n.get("id", ""),
+        "title": n.get("title", ""),
+        "summary": n.get("summary", ""),
+        "source": n.get("source", ""),
+        "url": n.get("url", ""),
+        "time": n.get("time", ""),
+        "date": n.get("date", ""),
+    } for n in news_list]
+
+    conn = _db()
+    _ensure_news_cache_table(conn)
+    # 清理今天旧缓存 + 过期数据
+    conn.execute("DELETE FROM news_cache WHERE date=?", (today,))
+    from datetime import timedelta as _td
+    cutoff = (datetime.now(TZ_BEIJING) - _td(days=NEWS_CACHE_DAYS + 1)).strftime("%Y-%m-%d")
+    conn.execute("DELETE FROM news_cache WHERE date < ?", (cutoff,))
+    # 写入
+    conn.execute(
+        "INSERT INTO news_cache (date, fetched_at, news_json) VALUES (?,?,?)",
+        (today, now, _json.dumps(serializable, ensure_ascii=False))
+    )
+    conn.commit()
+    conn.close()
+
+
+# ═══════════════════════════════════════════════════
 # 初始化
 # ═══════════════════════════════════════════════════
 
