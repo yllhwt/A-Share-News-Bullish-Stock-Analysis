@@ -11,7 +11,6 @@ from datetime import datetime, timezone, timedelta
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import streamlit as st
-import streamlit.components.v1 as components
 
 from app_config import (
     OUTPUT_DIR, MAX_ANALYSIS_PER_DAY, DEEPSEEK_MODEL,
@@ -34,39 +33,6 @@ st.set_page_config(
     initial_sidebar_state="collapsed",  # 默认折叠侧边栏
 )
 
-# 手机端自适应 CSS
-st.markdown("""
-<style>
-/* 全局 */
-@media (max-width: 768px) {
-    .stApp { padding: 0.5rem !important; }
-    h1 { font-size: 1.3rem !important; }
-    h2 { font-size: 1.1rem !important; }
-    h3 { font-size: 1rem !important; }
-    .stMarkdown table { font-size: 0.8rem !important; display: block; overflow-x: auto; }
-    .stMetric { font-size: 0.9rem !important; }
-    .stButton button { width: 100% !important; padding: 0.7rem !important; font-size: 1rem !important; }
-    .stCheckbox label { font-size: 0.85rem !important; }
-    .stCaption { font-size: 0.75rem !important; }
-}
-
-/* 表格横向滚动 */
-.stMarkdown table {
-    display: block;
-    overflow-x: auto;
-    white-space: nowrap;
-    max-width: 100%;
-}
-
-/* 按钮全宽 */
-div[data-testid="column"] .stButton button {
-    width: 100%;
-}
-
-/* 侧边栏更友好 */
-[data-testid="stSidebar"] { min-width: 280px !important; }
-</style>
-""", unsafe_allow_html=True)
 
 # ═══════════════════════════════════════════════════
 # 辅助：获取客户端 IP（Streamlit 限制，用 session ID 代替）
@@ -108,17 +74,21 @@ if "invite_handled" not in st.session_state:
     st.session_state.invite_handled = False
 
 # 用户标识 + 额度
-user_key = st.session_state._client_id
+try:
+    user_key = st.session_state._client_id
 
-# VIP：管理员自动无限
-admin_on = st.query_params.get("admin", "") == ADMIN_PASSWORD
-if admin_on:
-    quota = {"total": 999, "used": 0, "bonus": 0, "free_base": 999, "remaining": 999, "can_use": True, "is_new": False, "is_vip": True}
-else:
-    quota = get_quota(user_key)
+    admin_on = st.query_params.get("admin", "") == ADMIN_PASSWORD
+    if admin_on:
+        quota = {"total": 999, "used": 0, "bonus": 0, "free_base": 999, "remaining": 999, "can_use": True, "is_new": False, "is_vip": True}
+    else:
+        quota = get_quota(user_key)
 
-# 邀请链接
-invite_link = "分享功能开发中"
+    invite_link = "分享功能开发中"
+except Exception as _e:
+    st.error(f"启动失败: {_e}")
+    import traceback
+    st.code(traceback.format_exc())
+    st.stop()
 
 # ═══════════════════════════════════════════════════
 # 侧边栏
@@ -167,14 +137,7 @@ with st.sidebar:
             st.code(invite_link, language=None)
             st.caption(f"别人通过你的链接访问并使用，双方各得 {INVITE_BONUS} 次")
 
-            st.markdown("""
-            <div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0;">
-                <button onclick="navigator.clipboard.writeText('""" + invite_link + """');this.innerText='已复制！'"
-                    style="padding:6px 14px;border-radius:6px;border:1px solid #ddd;cursor:pointer;background:#07c160;color:white;">
-                    复制邀请链接
-                </button>
-            </div>
-            """, unsafe_allow_html=True)
+            st.caption("分享链接功能开发中")
 
             st.markdown("### 方式2: 看激励广告")
             if st.button(f"📺 观看广告 (+{AD_BONUS}次)", use_container_width=True):
