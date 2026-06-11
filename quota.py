@@ -10,24 +10,15 @@ import os
 import sqlite3
 import hashlib
 import secrets
-
-try:
-    from app_config import VIP_FPS
-except ImportError:
-    VIP_FPS = []
-
-
-def _is_vip(ip: str) -> bool:
-    return ip in VIP_FPS
 from datetime import datetime, timezone, timedelta
 
 TZ_BEIJING = timezone(timedelta(hours=8))
 DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "quota.db")
 
 # 配置
-FREE_LIFETIME = 3        # 新用户免费次数（有缓存成本极低）
+FREE_LIFETIME = 1        # 新用户终身免费次数（仅首次）
 INVITE_BONUS = 3         # 邀请成功后双方各得次数
-AD_BONUS = 3             # 看一次广告获得次数
+AD_BONUS = 1             # 看一次广告获得次数
 
 def _db():
     conn = sqlite3.connect(DB_PATH)
@@ -42,6 +33,7 @@ def init():
     conn.execute("""
         CREATE TABLE IF NOT EXISTS ip_quota (
             ip TEXT PRIMARY KEY,
+            free_claimed INTEGER DEFAULT 0,   -- 是否领过首次免费
             bonus INTEGER DEFAULT 0,           -- 通过邀请/广告获得的额外次数
             used INTEGER DEFAULT 0             -- 已使用次数
         )
@@ -69,62 +61,60 @@ def init():
 
 def get_quota(ip: str) -> dict:
     """获取某 IP 的剩余额度"""
-    if _is_vip(ip):
-        return {
-            "total": 999, "used": 0, "bonus": 0, "free_base": 999,
-            "remaining": 999, "can_use": True, "is_new": False, "is_vip": True,
-        }
-
     conn = _db()
-    row = conn.execute("SELECT bonus, used FROM ip_quota WHERE ip=?", (ip,)).fetchone()
+    row = conn.execute("SELECT free_claimed, bonus, used FROM ip_quota WHERE ip=?", (ip,)).fetchone()
     conn.close()
 
     if row:
+        free_base = FREE_LIFETIME if row["free_claimed"] == 0 else 0
         bonus = row["bonus"]
         used = row["used"]
     else:
+        free_base = FREE_LIFETIME  # 新用户有首次免费
         bonus = 0
         used = 0
 
-    total = FREE_LIFETIME + bonus
+    total = free_base + bonus
     remaining = max(0, total - used)
 
     return {
         "total": total,
         "used": used,
         "bonus": bonus,
-        "free_base": FREE_LIFETIME,
+        "free_base": free_base,
         "remaining": remaining,
         "can_use": remaining > 0,
-        "is_new": used == 0,
+        "is_new": free_base > 0 and used == 0,  # 还没用过首次免费
     }
 
 
 def use_one(ip: str) -> bool:
     """消耗一次额度，返回是否成功"""
-    if _is_vip(ip):
-        return True  # VIP 无限
     conn = _db()
 
-    row = conn.execute("SELECT bonus, used FROM ip_quota WHERE ip=?", (ip,)).fetchone()
+    row = conn.execute("SELECT free_claimed, bonus, used FROM ip_quota WHERE ip=?", (ip,)).fetchone()
 
     if row:
+        free_claimed = row["free_claimed"]
         bonus = row["bonus"]
         used = row["used"]
     else:
+        free_claimed = 0
         bonus = 0
         used = 0
         conn.execute(
-            "INSERT INTO ip_quota (ip, bonus, used) VALUES (?,0,0)",
+            "INSERT INTO ip_quota (ip, free_claimed, bonus, used) VALUES (?,0,0,0)",
             (ip,)
         )
 
-    total = FREE_LIFETIME + bonus
+    free_base = FREE_LIFETIME if free_claimed == 0 else 0
+    total = free_base + bonus
+
     if used >= total:
         conn.close()
         return False
 
-    conn.execute("UPDATE ip_quota SET used=used+1 WHERE ip=?", (ip,))
+    conn.execute("UPDATE ip_quota SET used=used+1, free_claimed=1 WHERE ip=?", (ip,))
     conn.commit()
     conn.close()
     return True
@@ -134,7 +124,7 @@ def add_bonus(ip: str, amount: int = INVITE_BONUS):
     """给某 IP 增加额外次数（邀请/广告奖励）"""
     conn = _db()
     conn.execute(
-        "INSERT INTO ip_quota (ip, bonus, used) VALUES (?,?,0) "
+        "INSERT INTO ip_quota (ip, free_claimed, bonus, used) VALUES (?,1,?,0) "
         "ON CONFLICT(ip) DO UPDATE SET bonus=bonus+?",
         (ip, amount, amount)
     )
@@ -324,186 +314,6 @@ def get_admin_stats(date_str: str = None) -> dict:
         "total_invites": total_invites,
         "total_ads": total_ads,
     }
-
-
-# ═══════════════════════════════════════════════════
-# 分析结果缓存（同新闻不重复调 API）
-# ═══════════════════════════════════════════════════
-
-def _ensure_cache_table(conn):
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS analysis_cache (
-            cache_key TEXT PRIMARY KEY,
-            news_title TEXT NOT NULL,
-            news_source TEXT NOT NULL,
-            analysis TEXT NOT NULL,
-            tokens_in INTEGER DEFAULT 0,
-            tokens_out INTEGER DEFAULT 0,
-            hit_count INTEGER DEFAULT 1,
-            created_at TEXT NOT NULL,
-            last_hit TEXT NOT NULL
-        )
-    """)
-    conn.commit()
-
-
-def get_cached_analysis(title: str, source: str) -> dict | None:
-    """查缓存，命中返回结果并更新计数，未命中返回 None"""
-    key = hashlib.md5(f"{source}|{title}".encode()).hexdigest()
-    conn = _db()
-    _ensure_cache_table(conn)
-    row = conn.execute(
-        "SELECT analysis, tokens_in, tokens_out, hit_count FROM analysis_cache WHERE cache_key=?",
-        (key,)
-    ).fetchone()
-    if row:
-        conn.execute(
-            "UPDATE analysis_cache SET hit_count=hit_count+1, last_hit=? WHERE cache_key=?",
-            (datetime.now(TZ_BEIJING).isoformat(), key)
-        )
-        conn.commit()
-        conn.close()
-        return {
-            "analysis": row["analysis"],
-            "tokens_in": row["tokens_in"],
-            "tokens_out": row["tokens_out"],
-            "hit_count": row["hit_count"] + 1,
-            "cached": True,
-        }
-    conn.close()
-    return None
-
-
-def set_cached_analysis(title: str, source: str, analysis: str,
-                        tokens_in: int, tokens_out: int):
-    """存入缓存"""
-    key = hashlib.md5(f"{source}|{title}".encode()).hexdigest()
-    now = datetime.now(TZ_BEIJING).isoformat()
-    conn = _db()
-    _ensure_cache_table(conn)
-    conn.execute(
-        "INSERT OR REPLACE INTO analysis_cache "
-        "(cache_key, news_title, news_source, analysis, tokens_in, tokens_out, created_at, last_hit) "
-        "VALUES (?,?,?,?,?,?,?,?)",
-        (key, title, source, analysis, tokens_in, tokens_out, now, now)
-    )
-    conn.commit()
-    conn.close()
-
-
-# ═══════════════════════════════════════════════════
-# 新闻抓取缓存（盘前/盘中/盘后定时刷新，省 token）
-# ═══════════════════════════════════════════════════
-
-import json as _json
-
-# 刷新时间点（北京时间）
-REFRESH_TIMES = ["08:00", "09:15", "12:00", "12:30", "15:00", "17:00"]
-
-# 缓存保留天数
-NEWS_CACHE_DAYS = 2
-
-
-def _ensure_news_cache_table(conn):
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS news_cache (
-            date TEXT NOT NULL,
-            fetched_at TEXT NOT NULL,
-            news_json TEXT NOT NULL
-        )
-    """)
-    conn.commit()
-
-
-def get_cached_news(today: str) -> tuple[list | None, str]:
-    """
-    检查新闻缓存是否有效。返回 (新闻列表, 刷新时间)。
-    查找最近 NEWS_CACHE_DAYS 天内的最新缓存。
-    如果缓存已过期需要刷新，返回 (None, last_refresh_time)。
-    """
-    now = datetime.now(TZ_BEIJING)
-    current_time = now.strftime("%H:%M")
-
-    # 找到最近一个已过的刷新时间点
-    last_refresh = ""
-    for t in REFRESH_TIMES:
-        if current_time >= t:
-            last_refresh = t
-
-    conn = _db()
-    _ensure_news_cache_table(conn)
-
-    # 找最新一条缓存（可能跨天）
-    row = conn.execute(
-        "SELECT date, fetched_at, news_json FROM news_cache ORDER BY fetched_at DESC LIMIT 1"
-    ).fetchone()
-    conn.close()
-
-    if not row:
-        return None, last_refresh
-
-    cache_date = row["date"]
-    cached_time = row["fetched_at"][:16]  # "2026-06-12T08:05"
-
-    # 检查缓存日期是否在2天内
-    from datetime import timedelta as _td
-    cutoff = (now - _td(days=NEWS_CACHE_DAYS)).strftime("%Y-%m-%d")
-    if cache_date < cutoff:
-        return None, last_refresh
-
-    # 如果是今天的缓存，检查是否过了刷新点
-    if cache_date == today and last_refresh:
-        if cached_time < f"{today}T{last_refresh}":
-            # 缓存在上个刷新点之前，需要刷新
-            return None, last_refresh
-
-    # 缓存有效
-    return _json.loads(row["news_json"]), last_refresh
-
-
-def set_cached_news(news_list: list):
-    """写入新闻缓存，自动清理旧数据"""
-    today = datetime.now(TZ_BEIJING).strftime("%Y-%m-%d")
-    now = datetime.now(TZ_BEIJING).isoformat()
-    # 只缓存标题/来源等可序列化字段
-    serializable = [{
-        "id": n.get("id", ""),
-        "title": n.get("title", ""),
-        "summary": n.get("summary", ""),
-        "source": n.get("source", ""),
-        "url": n.get("url", ""),
-        "time": n.get("time", ""),
-        "date": n.get("date", ""),
-    } for n in news_list]
-
-    conn = _db()
-    _ensure_news_cache_table(conn)
-    # 清理今天旧缓存 + 过期数据
-    conn.execute("DELETE FROM news_cache WHERE date=?", (today,))
-    from datetime import timedelta as _td
-    cutoff = (datetime.now(TZ_BEIJING) - _td(days=NEWS_CACHE_DAYS + 1)).strftime("%Y-%m-%d")
-    conn.execute("DELETE FROM news_cache WHERE date < ?", (cutoff,))
-    # 写入
-    conn.execute(
-        "INSERT INTO news_cache (date, fetched_at, news_json) VALUES (?,?,?)",
-        (today, now, _json.dumps(serializable, ensure_ascii=False))
-    )
-    conn.commit()
-    conn.close()
-
-
-# ═══════════════════════════════════════════════════
-# 管理员操作
-# ═══════════════════════════════════════════════════
-
-def reset_all_quota():
-    """重置所有用户的免费次数（used 归零，bonus 保留）"""
-    conn = _db()
-    conn.execute("UPDATE ip_quota SET used = 0")
-    count = conn.total_changes
-    conn.commit()
-    conn.close()
-    return count
 
 
 # ═══════════════════════════════════════════════════

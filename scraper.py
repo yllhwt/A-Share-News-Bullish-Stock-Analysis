@@ -24,7 +24,6 @@ except ImportError:
     HAS_LXML = False
 
 from app_config import RSS_SOURCES, DEBUG, DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL, DEEPSEEK_MODEL
-from quota import get_cached_news, set_cached_news
 
 # 北京时区
 TZ_BEIJING = timezone(timedelta(hours=8))
@@ -453,27 +452,13 @@ def ai_filter_news(news_list, model=None):
 
 
 def fetch_today_news(limit_per_source=30, ai_filter=False):
-    """快捷方法：抓取今日新闻（带缓存，盘前/盘中/盘后定时刷新）"""
-    today = datetime.now(TZ_BEIJING).strftime("%Y-%m-%d")
-
-    # 查缓存
-    cached, refresh_point = get_cached_news(today)
-    if cached is not None:
-        print(f"[缓存] 新闻缓存有效 (刷新点: {refresh_point})，共 {len(cached)} 条")
-        return cached
-
-    # 缓存过期或不存在，重新抓取
-    print(f"[抓取] 缓存过期 (刷新点: {refresh_point})，重新抓取财经新闻...")
+    """快捷方法：抓取今日新闻（自动过滤）"""
+    print("[抓取] 正在抓取财经新闻...")
     items = fetch_all_news(limit_per_source=limit_per_source, a_stock_filter=True)
     print(f"[抓取] 关键词过滤后共 {len(items)} 条")
 
     if ai_filter and items:
         items = ai_filter_news(items)
-
-    # 写入缓存
-    if items:
-        set_cached_news(items)
-        print(f"[缓存] 已写入缓存，下次刷新点后失效")
 
     print(f"[OK] 最终 {len(items)} 条 A股/产业相关新闻\n")
     return items

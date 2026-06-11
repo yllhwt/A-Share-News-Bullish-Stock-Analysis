@@ -19,7 +19,6 @@ from app_config import (
     DEBUG,
     COMPLIANCE_MODE,
 )
-from quota import get_cached_analysis, set_cached_analysis
 
 # 懒加载客户端，避免 import 时因缺 key 崩溃
 _client = None
@@ -307,26 +306,9 @@ def analyze_news(news_item: dict, model: str = None) -> dict:
     if model is None:
         model = DEEPSEEK_MODEL
 
-    title = news_item.get("title", "")
-
-    # 缓存检查
-    cached = get_cached_analysis(title, news_item.get("source", ""))
-    if cached:
-        print(f"  [缓存命中] {title[:40]}... (已被分析 {cached['hit_count']} 次, 省了 token)")
-        result = {
-            "news": news_item,
-            "analysis": cached["analysis"],
-            "model": model,
-            "tokens_in": cached["tokens_in"],
-            "tokens_out": cached["tokens_out"],
-            "success": True,
-            "error": None,
-            "cached": True,
-        }
-        return result
-
     # 联网搜索：先搜出相关公司信息，再喂给 LLM
     search_context = ""
+    title = news_item.get("title", "")
     if title:
         print(f"  [搜索] 正在联网搜索相关公司: {title[:40]}...")
         search_context = search_company_context(title)
@@ -369,13 +351,6 @@ def analyze_news(news_item: dict, model: str = None) -> dict:
         result["tokens_in"] = response.usage.prompt_tokens
         result["tokens_out"] = response.usage.completion_tokens
         result["success"] = True
-
-        # 存入缓存
-        set_cached_analysis(
-            title, news_item.get("source", ""),
-            result["analysis"],
-            result["tokens_in"], result["tokens_out"]
-        )
 
     except Exception as e:
         result["error"] = str(e)
