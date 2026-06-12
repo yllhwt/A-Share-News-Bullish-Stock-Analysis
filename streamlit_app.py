@@ -156,13 +156,27 @@ if news_list:
         count = get_news_analysis_count(n.get("title",""), n.get("source",""))
         url = n.get("url", "")
 
-        # 一行：复选框 + 原文链接
-        ck, lk = st.columns([24, 1])
-        with ck:
-            prefix = f"【今日已分析{count}次】" if count > 0 else ""
-            label = f"{prefix} {n.get('time','')} [{n['source']}] {n['title'][:65]}"
+        # 热度颜色：0次=深绿 → 5次=灰 → 10+次=深红
+        if count == 0:
+            color = "#1a8a1a"
+        elif count <= 2:
+            color = "#5a9a2a"
+        elif count <= 4:
+            color = "#888888"
+        elif count <= 6:
+            color = "#b85a1a"
+        elif count <= 9:
+            color = "#c42020"
+        else:
+            color = "#8a0a0a"
+
+        c1, c2, c3 = st.columns([4, 20, 1])
+        with c1:
+            st.markdown(f"<span style='color:{color};font-weight:bold;font-size:14px'>今日已分析{count}次</span>", unsafe_allow_html=True)
+        with c2:
+            label = f"{n.get('time','')} [{n['source']}] {n['title'][:65]}"
             checked = st.checkbox(label, value=False, key=f"news_{i}")
-        with lk:
+        with c3:
             if url:
                 st.link_button("🔗", url, help="查看原文")
 
