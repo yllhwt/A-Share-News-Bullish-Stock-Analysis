@@ -152,19 +152,17 @@ if news_list:
     if "news_keywords" not in st.session_state:
         st.session_state.news_keywords = {}
 
-    all_checked = st.checkbox("全选", value=False)
-
     for i, n in enumerate(news_list):
         count = get_news_analysis_count(n.get("title",""), n.get("source",""))
         url = n.get("url", "")
 
-        ct, ck, lk = st.columns([2, 10, 1])
+        ct, ck, lk = st.columns([1, 15, 0.5])
         with ct:
             if count > 0:
-                st.markdown(f"**:red[（{count}次）]**")
+                st.markdown(f"**:red[{count}次]**")
         with ck:
-            label = f"{n.get('time','')} [{n['source']}] {n['title'][:60]}"
-            checked = st.checkbox(label, value=all_checked, key=f"news_{i}")
+            label = f"{n.get('time','')} [{n['source']}] {n['title'][:70]}"
+            checked = st.checkbox(label, value=False, key=f"news_{i}")
         with lk:
             if url:
                 st.link_button("🔗", url, help="查看原文")
