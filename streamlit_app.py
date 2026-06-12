@@ -20,7 +20,7 @@ from scraper import fetch_today_news, ai_filter_news
 from analyzer import analyze_multiple, calc_tokens, analyze_news
 from quota import (
     get_quota, use_one, create_invite_code, claim_invite_code,
-    get_my_invite_link, record_ad_view, FREE_CACHE, FREE_FRESH_NEW, INVITE_BONUS, AD_BONUS,
+    get_my_invite_link, record_ad_view, FREE_CACHE, FREE_FRESH, INVITE_BONUS, AD_BONUS,
     record_api_usage, get_daily_cost, get_admin_stats, get_cached_analysis,
 )
 from datetime import datetime, timezone, timedelta
@@ -31,12 +31,15 @@ st.set_page_config(
     page_title="A股利好新闻AI大模型分析",
     page_icon="📰",
     layout="centered",
-    initial_sidebar_state="collapsed",
+    initial_sidebar_state="auto",
 )
 
-# ── 手机端适配 ──
+# ── 手机端适配 + 按钮橙色 ──
 st.markdown("""
 <style>
+/* 主要按钮改橙色 */
+button[kind="primary"], button[kind="primaryFormSubmit"] { background-color: #FF6600 !important; color: white !important; font-weight: bold !important; border: none !important; }
+button[kind="primary"]:hover { background-color: #E55D00 !important; }
 @media (max-width: 768px) {
     .stApp { padding: 0.3rem !important; }
     h1 { font-size: 1.2rem !important; }
@@ -106,7 +109,7 @@ with st.sidebar:
         st.metric("看缓存剩余", quota["cache_rem"])
         st.metric("全新分析剩余", quota["fresh_rem"])
         if quota["is_new"]:
-            st.success(f"🎁 首次登录得 {quota['fresh_base']} 次全新分析")
+            st.success(f"🎁 新用户得 {FREE_FRESH} 次全新分析（终生）")
     st.caption(f"分享/看广告得全新分析次数 | 现有 +{quota['bonus']} 次")
 
     # ── 打赏 ──

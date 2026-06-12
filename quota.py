@@ -28,8 +28,7 @@ DB_PATH = os.path.join(_DATA_DIR, "quota.db")
 
 # 配置
 FREE_CACHE = 3        # 每日免费看缓存次数
-FREE_FRESH_NEW = 3    # 首次登录得全新分析次数
-FREE_FRESH_DAILY = 0  # 老用户每日全新分析次数
+FREE_FRESH = 3        # 每个用户终生免费全新分析次数
 INVITE_BONUS = 1      # 邀请后双方各得全新分析次数
 AD_BONUS = 2          # 看广告得全新分析次数
 
@@ -46,7 +45,7 @@ def init():
     # 检查旧表结构，如有冲突自动迁移
     cur = conn.execute("PRAGMA table_info(ip_quota)")
     cols = [r[1] for r in cur.fetchall()]
-    if cols and ("date" not in cols or "cache_used" not in cols):
+    if cols and ("date" not in cols or "fresh_lifetime" not in cols):
         conn.execute("DROP TABLE ip_quota")
         cols = []
     if not cols:
@@ -57,6 +56,7 @@ def init():
                 bonus INTEGER DEFAULT 0,
                 cache_used INTEGER DEFAULT 0,
                 fresh_used INTEGER DEFAULT 0,
+                fresh_lifetime INTEGER DEFAULT 0,
                 PRIMARY KEY (ip, date)
             )
         """)
@@ -95,13 +95,13 @@ def get_quota(ip: str) -> dict:
     conn = _db()
     has_history = conn.execute("SELECT 1 FROM ip_quota WHERE ip=?", (ip,)).fetchone() is not None
     row = conn.execute("SELECT bonus, cache_used, fresh_used FROM ip_quota WHERE ip=? AND date=?", (ip, today)).fetchone()
+    total_fresh = conn.execute("SELECT COALESCE(SUM(fresh_used), 0) FROM ip_quota WHERE ip=?", (ip,)).fetchone()[0]
     conn.close()
 
     bonus = row["bonus"] if row else 0
     cache_used = row["cache_used"] if row else 0
     fresh_used = row["fresh_used"] if row else 0
-
-    fresh_base = FREE_FRESH_NEW if not has_history else FREE_FRESH_DAILY
+    fresh_base = max(0, FREE_FRESH - total_fresh)
 
     cache_rem = max(0, FREE_CACHE - cache_used)
     fresh_rem = max(0, fresh_base + bonus - fresh_used)
@@ -117,18 +117,18 @@ def use_one(ip: str, fresh: bool = False) -> bool:
         return True
     today = _today()
     conn = _db()
-    # 先查历史（在插入今日行之前！）
-    has_history = conn.execute("SELECT 1 FROM ip_quota WHERE ip=?", (ip,)).fetchone() is not None
+    # 先查历史总量（在插入今日行之前！）
+    total_fresh = conn.execute("SELECT COALESCE(SUM(fresh_used), 0) FROM ip_quota WHERE ip=?", (ip,)).fetchone()[0]
 
     row = conn.execute("SELECT bonus, cache_used, fresh_used FROM ip_quota WHERE ip=? AND date=?", (ip, today)).fetchone()
     if not row:
-        conn.execute("INSERT INTO ip_quota (ip, date, bonus, cache_used, fresh_used) VALUES (?,?,0,0,0)", (ip, today))
+        conn.execute("INSERT INTO ip_quota (ip, date, bonus, cache_used, fresh_used, fresh_lifetime) VALUES (?,?,0,0,0,?)", (ip, today, total_fresh))
         bonus, cache_used, fresh_used = 0, 0, 0
     else:
         bonus, cache_used, fresh_used = row["bonus"], row["cache_used"], row["fresh_used"]
 
     if fresh:
-        fresh_base = FREE_FRESH_NEW if not has_history else FREE_FRESH_DAILY
+        fresh_base = max(0, FREE_FRESH - total_fresh)
         if fresh_used >= fresh_base + bonus:
             conn.close()
             return False
