@@ -110,6 +110,7 @@ with st.sidebar:
         if quota["is_new"]:
             st.success(f"🎁 新用户得 {FREE_FRESH} 次全新分析（终生）")
     st.caption(f"分享/看广告得全新分析次数 | 现有 +{quota['bonus']} 次")
+    st.caption(f"🆔 {user_key[:8]}")
 
     # ── 打赏 ──
     st.divider()
