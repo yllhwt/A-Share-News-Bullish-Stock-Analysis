@@ -27,8 +27,9 @@ os.makedirs(_DATA_DIR, exist_ok=True)
 DB_PATH = os.path.join(_DATA_DIR, "quota.db")
 
 # 配置
-FREE_CACHE = 3        # 每日免费看已有缓存结果次数
-FREE_FRESH = 0        # 每日免费全新分析次数（0=只给缓存）
+FREE_CACHE = 3        # 每日免费看缓存次数
+FREE_FRESH_NEW = 3    # 首次登录得全新分析次数
+FREE_FRESH_DAILY = 0  # 老用户每日全新分析次数
 INVITE_BONUS = 1      # 邀请后双方各得全新分析次数
 AD_BONUS = 2          # 看广告得全新分析次数
 
@@ -99,12 +100,15 @@ def get_quota(ip: str) -> dict:
     cache_used = row["cache_used"] if row else 0
     fresh_used = row["fresh_used"] if row else 0
 
+    # 首次登录给3次全新分析，之后每天0次
+    fresh_base = FREE_FRESH_NEW if not row else FREE_FRESH_DAILY
+
     cache_rem = max(0, FREE_CACHE - cache_used)
-    fresh_rem = max(0, FREE_FRESH + bonus - fresh_used)
+    fresh_rem = max(0, fresh_base + bonus - fresh_used)
     return {"remaining": cache_rem + fresh_rem, "cache_rem": cache_rem,
             "fresh_rem": fresh_rem, "bonus": bonus,
             "can_use": cache_rem + fresh_rem > 0,
-            "is_new": cache_used == 0 and fresh_used == 0}
+            "is_new": not row, "fresh_base": fresh_base}
 
 
 def use_one(ip: str, fresh: bool = False) -> bool:
@@ -121,7 +125,10 @@ def use_one(ip: str, fresh: bool = False) -> bool:
         bonus, cache_used, fresh_used = row["bonus"], row["cache_used"], row["fresh_used"]
 
     if fresh:
-        if fresh_used >= FREE_FRESH + bonus:
+        # 检查是否新用户（ip_quota 里从未出现过）
+        existing = conn.execute("SELECT 1 FROM ip_quota WHERE ip=?", (ip,)).fetchone()
+        fresh_base = FREE_FRESH_NEW if not existing else FREE_FRESH_DAILY
+        if fresh_used >= fresh_base + bonus:
             conn.close()
             return False
         conn.execute("UPDATE ip_quota SET fresh_used=fresh_used+1 WHERE ip=? AND date=?", (ip, today))

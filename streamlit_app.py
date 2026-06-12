@@ -20,7 +20,7 @@ from scraper import fetch_today_news, ai_filter_news
 from analyzer import analyze_multiple, calc_tokens, analyze_news
 from quota import (
     get_quota, use_one, create_invite_code, claim_invite_code,
-    get_my_invite_link, record_ad_view, FREE_CACHE, FREE_FRESH, INVITE_BONUS, AD_BONUS,
+    get_my_invite_link, record_ad_view, FREE_CACHE, FREE_FRESH_NEW, INVITE_BONUS, AD_BONUS,
     record_api_usage, get_daily_cost, get_admin_stats, get_cached_analysis,
 )
 from datetime import datetime, timezone, timedelta
@@ -106,7 +106,7 @@ with st.sidebar:
         st.metric("看缓存剩余", quota["cache_rem"])
         st.metric("全新分析剩余", quota["fresh_rem"])
         if quota["is_new"]:
-            st.success(f"🎁 每日免费看缓存 {FREE_CACHE} 次")
+            st.success(f"🎁 首次登录得 {quota['fresh_base']} 次全新分析")
     st.caption(f"分享/看广告得全新分析次数 | 现有 +{quota['bonus']} 次")
 
     # ── 打赏 ──
@@ -193,15 +193,17 @@ if news_list:
         else: cname = "red"
 
         prefix = f"【今日已被分析{count}次】" if count > 0 else ""
-        full_label = f"{prefix}{n.get('time','')} [{n['source']}] {n['title'][:68]}"
+        label = f":{cname}[{prefix}{n.get('time','')} [{n['source']}]]" if count > 0 else f"{prefix}{n.get('time','')} [{n['source']}]"
+        title_text = n['title'][:70]
 
-        ck, lk = st.columns([24, 1])
+        ck, tl = st.columns([1, 20])
         with ck:
-            label = f":{cname}[{full_label}]" if count > 0 else full_label
-            checked = st.checkbox(label, value=False, key=f"news_{i}")
-        with lk:
+            checked = st.checkbox("☐", value=False, key=f"news_{i}", label_visibility="collapsed")
+        with tl:
             if url:
-                st.link_button("🔗", url, help="查看原文")
+                st.markdown(f"{label} [{title_text}]({url})", unsafe_allow_html=False)
+            else:
+                st.markdown(f"{label} {title_text}")
 
         if checked and n not in st.session_state.selected_news:
             st.session_state.selected_news.append(n)
