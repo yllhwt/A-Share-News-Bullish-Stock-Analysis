@@ -156,20 +156,20 @@ if news_list:
         count = get_news_analysis_count(n.get("title",""), n.get("source",""))
         url = n.get("url", "")
 
-        # 热度渐变色：0=深绿 → 5=灰 → 10+=深红
-        if count == 0: color = "#1a8a1a"
-        elif count <= 2: color = "#5a9a2a"
-        elif count <= 4: color = "#888888"
-        elif count <= 6: color = "#b85a1a"
-        elif count <= 9: color = "#c42020"
-        else: color = "#8a0a0a"
+        # 热度渐变色：0=绿 → 5=灰 → 10+=红
+        if count == 0: cname = "green"
+        elif count <= 2: cname = "green"
+        elif count <= 4: cname = "gray"
+        elif count <= 6: cname = "orange"
+        else: cname = "red"
 
         prefix = f"【今日已分析{count}次】" if count > 0 else ""
         full_label = f"{prefix}{n.get('time','')} [{n['source']}] {n['title'][:68]}"
 
         ck, lk = st.columns([24, 1])
         with ck:
-            checked = st.checkbox(f":{color}[{full_label}]", value=False, key=f"news_{i}")
+            label = f":{cname}[{full_label}]" if count > 0 else full_label
+            checked = st.checkbox(label, value=False, key=f"news_{i}")
         with lk:
             if url:
                 st.link_button("🔗", url, help="查看原文")
