@@ -454,11 +454,11 @@ def fetch_today_news(limit_per_source=30, ai_filter=False):
     from quota import get_cached_news, set_cached_news
     today = datetime.now(TZ_BEIJING).strftime("%Y-%m-%d")
 
-    cached, refresh_point = get_cached_news(today)
+    cached, cached_dropped, refresh_point = get_cached_news(today)
     if cached is not None:
         print(f"[缓存] 新闻缓存有效 (刷新点: {refresh_point})，共 {len(cached)} 条")
         if ai_filter:
-            return cached, []
+            return cached, cached_dropped or []
         return cached
 
     print(f"[抓取] 缓存过期 (刷新点: {refresh_point})，重新抓取...")
@@ -470,8 +470,8 @@ def fetch_today_news(limit_per_source=30, ai_filter=False):
         items, dropped_items = ai_filter_news(items)
 
     if items:
-        set_cached_news(items)
-        print(f"[缓存] 已写入缓存")
+        set_cached_news(items, dropped_items)
+        print(f"[缓存] 已写入缓存（保留{len(items)}条，过滤{len(dropped_items)}条）")
 
     print(f"[OK] 最终 {len(items)} 条\n")
     if ai_filter:

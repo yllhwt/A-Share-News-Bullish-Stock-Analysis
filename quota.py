@@ -368,11 +368,16 @@ def _ensure_news_cache_table(conn):
             news_json TEXT NOT NULL
         )
     """)
+    # 兼容旧表：无 dropped_json 列则自动添加
+    cur = conn.execute("PRAGMA table_info(news_cache)")
+    cols = [r[1] for r in cur.fetchall()]
+    if "dropped_json" not in cols:
+        conn.execute("ALTER TABLE news_cache ADD COLUMN dropped_json TEXT DEFAULT '[]'")
     conn.commit()
 
 
 def get_cached_news(today: str):
-    """检查新闻缓存。返回 (新闻列表, 刷新时间) 或 (None, last_refresh) 表示需刷新"""
+    """检查新闻缓存。返回 (新闻列表, 被过滤列表, 刷新时间) 或 (None, None, last_refresh) 表示需刷新"""
     now = datetime.now(TZ_BEIJING)
     current_time = now.strftime("%H:%M")
     last_refresh = ""
@@ -383,29 +388,31 @@ def get_cached_news(today: str):
     conn = _db()
     _ensure_news_cache_table(conn)
     row = conn.execute(
-        "SELECT date, fetched_at, news_json FROM news_cache ORDER BY fetched_at DESC LIMIT 1"
+        "SELECT date, fetched_at, news_json, dropped_json FROM news_cache ORDER BY fetched_at DESC LIMIT 1"
     ).fetchone()
     conn.close()
 
     if not row:
-        return None, last_refresh
+        return None, None, last_refresh
 
     from datetime import timedelta as _td
     cutoff = (now - _td(days=NEWS_CACHE_DAYS)).strftime("%Y-%m-%d")
     if row["date"] < cutoff:
-        return None, last_refresh
+        return None, None, last_refresh
 
     cache_date = row["date"]
     cached_time = row["fetched_at"][:16]
     if cache_date == today and last_refresh:
         if cached_time < f"{today}T{last_refresh}":
-            return None, last_refresh
+            return None, None, last_refresh
 
-    return _json.loads(row["news_json"]), last_refresh
+    return _json.loads(row["news_json"]), _json.loads(row["dropped_json"]), last_refresh
 
 
-def set_cached_news(news_list: list):
-    """写入新闻缓存"""
+def set_cached_news(news_list: list, dropped_list: list = None):
+    """写入新闻缓存（含被过滤新闻）"""
+    if dropped_list is None:
+        dropped_list = []
     today = datetime.now(TZ_BEIJING).strftime("%Y-%m-%d")
     now = datetime.now(TZ_BEIJING).isoformat()
     serializable = [{
@@ -413,6 +420,10 @@ def set_cached_news(news_list: list):
         "summary": n.get("summary", ""), "source": n.get("source", ""),
         "url": n.get("url", ""), "time": n.get("time", ""), "date": n.get("date", ""),
     } for n in news_list]
+    dropped_json = _json.dumps([{
+        "id": n.get("id", ""), "title": n.get("title", ""),
+        "source": n.get("source", ""), "url": n.get("url", ""),
+    } for n in dropped_list], ensure_ascii=False)
 
     conn = _db()
     _ensure_news_cache_table(conn)
@@ -421,8 +432,8 @@ def set_cached_news(news_list: list):
     cutoff = (datetime.now(TZ_BEIJING) - _td(days=NEWS_CACHE_DAYS + 1)).strftime("%Y-%m-%d")
     conn.execute("DELETE FROM news_cache WHERE date < ?", (cutoff,))
     conn.execute(
-        "INSERT INTO news_cache (date, fetched_at, news_json) VALUES (?,?,?)",
-        (today, now, _json.dumps(serializable, ensure_ascii=False))
+        "INSERT INTO news_cache (date, fetched_at, news_json, dropped_json) VALUES (?,?,?,?)",
+        (today, now, _json.dumps(serializable, ensure_ascii=False), dropped_json)
     )
     conn.commit()
     conn.close()
