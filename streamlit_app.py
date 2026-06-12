@@ -160,7 +160,7 @@ if news_list:
         col1, col2, col3 = st.columns([3, 20, 1])
         with col1:
             if count > 0:
-                st.markdown(f"<span style='color:red;font-weight:bold'>{count}次</span>", unsafe_allow_html=True)
+                st.markdown(f"<span style='color:red;font-weight:bold'>今日已分析{count}次</span>", unsafe_allow_html=True)
         with col2:
             label = f"{n.get('time','')} [{n['source']}] {n['title'][:65]}"
             checked = st.checkbox(label, value=False, key=f"news_{i}")
