@@ -266,16 +266,14 @@ if news_list:
 
         results = []
         total = selected_count
+        error_msg = ""
 
         for i, item in enumerate(selected_items):
             # 判断是否走缓存
             is_cached = get_cached_analysis(item.get("title",""), item.get("source","")) is not None
 
             if not admin_on and not use_one(user_key, fresh=not is_cached):
-                if is_cached:
-                    status_text.text(f"缓存免费次数用完！已分析 {i}/{total}")
-                else:
-                    status_text.text(f"全新分析次数用完！看广告或分享获取")
+                error_msg = "看缓存次数用完，分享或看广告获取" if is_cached else "全新分析次数用完，看广告或分享获取"
                 break
 
             if not admin_on and get_daily_cost() >= DAILY_COST_LIMIT:
@@ -301,14 +299,21 @@ if news_list:
         status_text.empty()
 
         success = sum(1 for r in results if r["success"])
-        st.success(f"分析完成: 成功 {success} · 失败 {total - success}")
         quota = get_quota(user_key)
         st.session_state.results = results
+        st.session_state.result_msg = f"分析完成: 成功 {success} · 失败 {total - success}"
+        st.session_state.error_msg = error_msg
         st.session_state.selected_news = []
         st.rerun()
 
 # ── 展示结果 ──
 results = st.session_state.results
+if st.session_state.get("error_msg"):
+    st.error(st.session_state.error_msg)
+    st.session_state.error_msg = ""
+if st.session_state.get("result_msg"):
+    st.success(st.session_state.result_msg)
+    st.session_state.result_msg = ""
 if results:
     st.divider()
     st.subheader("📊 分析结果")
