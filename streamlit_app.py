@@ -126,8 +126,10 @@ with st.sidebar:
             st.caption("分享功能开发中")
 
             st.markdown("### 方式2: 看激励广告")
-            if st.button(f"📺 观看广告 (+{AD_BONUS}次)", use_container_width=True):
-                st.info("暂无广告，敬请期待")
+            if st.button(f"📺 看广告得{AD_BONUS}次分析", use_container_width=True):
+                record_ad_view(user_key)
+                st.success(f"+{AD_BONUS}次！")
+                st.rerun()
 
     st.caption(f"你的标识: `{user_key[:12]}`")
 
@@ -312,19 +314,31 @@ if results:
             else:
                 st.error(f"分析失败: {r.get('error','')}")
 
-    # 导出
+    # ── 二次分析：DeepSeek 价格预估 ──
     st.divider()
-    date_str = datetime.now(TZ_BEIJING).strftime("%Y-%m-%d")
-    report_lines = [f"# A股利好新闻AI大模型分析系统——（豆包版）报告 — {date_str}\n"]
-    report_lines.append(f"> 模型: {DEEPSEEK_MODEL}\n\n---\n")
-    for i, r in enumerate(results, 1):
-        news = r["news"]
-        report_lines.append(f"## {i}. {news['title']}\n")
-        report_lines.append(f"*{news['source']} | {news.get('time','')}*\n")
-        report_lines.append(r["analysis"] if r["success"] else f"*分析失败*")
-        report_lines.append("\n---\n")
+    st.subheader("🔍 想让 AI 帮你估价格？")
+    st.caption("复制下方模板 → 打开 DeepSeek → 粘贴 → 获得现价/保守/中性/乐观价")
+    st.link_button("🚀 打开 DeepSeek", "https://chat.deepseek.com/")
 
-    st.download_button("💾 下载报告", "\n".join(report_lines), f"{date_str}.md", "text/markdown")
+    prompt_template = """你是A股产业链分析师。请联网搜索后，对以下公司列表做价格分析。
+按产业链分组输出表格：
+
+| 代码 | 名称 | 现价 | 保守目标价 | 中性目标价 | 乐观目标价 | 价格来源 |
+
+规则：
+- 现价取最新收盘价
+- 保守/中性/乐观基于行业估值+公司基本面+近期催化
+- 价格来源标注券商名称（如"中信"）或"AI综合估算"
+- 禁止编造，搜不到的写"暂无"
+
+---
+"""
+    for i, r in enumerate(results):
+        if r["success"]:
+            prompt_template += f"\n## 新闻{i+1}：{r['news']['title']}\n{r['analysis']}\n"
+
+    st.code(prompt_template, language=None)
+    st.caption("👆 全选复制，粘贴到 DeepSeek 对话框，AI 帮你做价格分析。本平台不提供价格预测。")
 
 else:
     st.info("👆 点击「抓取新闻」开始")
