@@ -108,7 +108,7 @@ with st.sidebar:
     if quota.get("is_vip"):
         st.success("👑 VIP 无限")
     elif quota["is_new"]:
-        st.success(f"🎁 每日免费 {FREE_LIFETIME} 次")
+        st.success(f"🎁 每日免费看已有分析结果 {FREE_LIFETIME} 次")
     st.caption(f"邀请奖励 +{quota['bonus']} 次 | 分享/看广告获取更多")
 
     # ── 打赏 ──

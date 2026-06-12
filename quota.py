@@ -27,7 +27,7 @@ os.makedirs(_DATA_DIR, exist_ok=True)
 DB_PATH = os.path.join(_DATA_DIR, "quota.db")
 
 # 配置
-FREE_LIFETIME = 1        # 每日免费次数，每天重置
+FREE_LIFETIME = 3        # 每日免费看缓存结果次数，每天重置
 INVITE_BONUS = 3         # 邀请成功后双方各得次数
 AD_BONUS = 3             # 看一次广告获得次数
 
