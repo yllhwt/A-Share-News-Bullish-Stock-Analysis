@@ -156,16 +156,14 @@ if news_list:
 
     for i, n in enumerate(news_list):
         count = get_news_analysis_count(n.get("title",""), n.get("source",""))
-        count_str = f" [{count}次]" if count > 0 else ""
         url = n.get("url", "")
 
-        ck, lk = st.columns([10, 1])
+        ck, lk = st.columns([12, 1])
         with ck:
-            checked = st.checkbox(
-                f"{n.get('time','')} [{n['source']}] {count_str} {n['title'][:70]}",
-                value=all_checked,
-                key=f"news_{i}",
-            )
+            label = f"{n.get('time','')} [{n['source']}] {n['title'][:70]}"
+            if count > 0:
+                label += f"  🔴{count}次"
+            checked = st.checkbox(label, value=all_checked, key=f"news_{i}")
         with lk:
             if url:
                 st.link_button("🔗", url, help="查看原文")
