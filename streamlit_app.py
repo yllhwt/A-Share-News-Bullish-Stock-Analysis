@@ -157,12 +157,18 @@ if news_list:
     for i, n in enumerate(news_list):
         count = get_news_analysis_count(n.get("title",""), n.get("source",""))
         count_str = f" [{count}次]" if count > 0 else ""
+        url = n.get("url", "")
 
-        checked = st.checkbox(
-            f"{n.get('time','')} [{n['source']}] {count_str} {n['title'][:70]}",
-            value=all_checked,
-            key=f"news_{i}",
-        )
+        ck, lk = st.columns([10, 1])
+        with ck:
+            checked = st.checkbox(
+                f"{n.get('time','')} [{n['source']}] {count_str} {n['title'][:70]}",
+                value=all_checked,
+                key=f"news_{i}",
+            )
+        with lk:
+            if url:
+                st.link_button("🔗", url, help="查看原文")
 
         if checked and n not in st.session_state.selected_news:
             st.session_state.selected_news.append(n)
@@ -175,7 +181,7 @@ if news_list:
             kw_options = [kw for kw, _ in top_kws]
             hint = f"历史: {'/'.join(kw_options[:2])}" if kw_options else ""
 
-            # 初始化关键词 session state（防输入重置）
+            # 关键词输入（超过6字自动截断，不顶替）
             kw_key = f"kw_val_{i}"
             if kw_key not in st.session_state:
                 st.session_state[kw_key] = kw_options[0] if kw_options else ""
@@ -183,8 +189,12 @@ if news_list:
             kw = st.text_input(
                 f"核心关键词(1-6字)  {hint}",
                 key=kw_key,
-                max_chars=6, placeholder="如：钼代钨",
+                placeholder="如：钼代钨",
             )
+            # 超过6字自动截断
+            if kw and len(kw) > 6:
+                st.session_state[kw_key] = kw[:6]
+                st.rerun()
             if kw:
                 st.session_state.news_keywords[n.get("title","")] = kw
 
@@ -196,6 +206,7 @@ if news_list:
         with st.expander(f"🚫 已过滤新闻 ({len(st.session_state.dropped_news)} 条，单公司/利空/大盘播报等，不可分析)", expanded=False):
             for n in st.session_state.dropped_news:
                 st.caption(f"[{n['source']}] {n['title'][:100]}")
+            st.caption("[豆包搜索](https://www.doubao.com/) 想查可以自己去搜")
 
     st.caption(f"已选择 {selected_count} 条 | 上限 {MAX_ANALYSIS_PER_DAY} | 剩余 {quota['remaining']}")
 

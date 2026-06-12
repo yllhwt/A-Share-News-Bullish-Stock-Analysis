@@ -16,7 +16,7 @@ from datetime import datetime, timezone, timedelta
 # 确保能导入同目录模块
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from app_config import OUTPUT_DIR, MAX_ANALYSIS_PER_DAY, DEEPSEEK_MODEL, DEBUG
+from app_config import OUTPUT_DIR, MAX_ANALYSIS_PER_DAY, DEEPSEEK_MODEL, DqEBUG
 from scraper import fetch_today_news
 from analyzer import analyze_multiple, calc_tokens
 
@@ -149,7 +149,12 @@ def main():
     print()
 
     # ── Step 1: 抓取新闻 + AI 预筛 ──
-    news_list = fetch_today_news(limit_per_source=30, ai_filter=True)
+    result = fetch_today_news(limit_per_source=30, ai_filter=True)
+    if isinstance(result, tuple):
+        news_list, dropped = result
+        print(f"[过滤] 保留 {len(news_list)} 条，剔除 {len(dropped)} 条")
+    else:
+        news_list = result
 
     if not news_list:
         print("未抓取到任何 A股/产业相关新闻，请检查网络或新闻源配置。")
