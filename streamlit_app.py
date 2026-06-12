@@ -196,12 +196,12 @@ if news_list:
         label = f":{cname}[{prefix}{n.get('time','')} [{n['source']}]]" if count > 0 else f"{prefix}{n.get('time','')} [{n['source']}]"
         title_text = n['title'][:70]
 
-        ck, tl = st.columns([1, 20])
-        with ck:
-            checked = st.checkbox("☐", value=False, key=f"news_{i}", label_visibility="collapsed")
-        with tl:
+        c1, c2 = st.columns([0.5, 20])
+        with c1:
+            checked = st.checkbox(" ", value=False, key=f"news_{i}")
+        with c2:
             if url:
-                st.markdown(f"{label} [{title_text}]({url})", unsafe_allow_html=False)
+                st.markdown(f'{label} <a href="{url}" target="_blank">{title_text}</a>', unsafe_allow_html=True)
             else:
                 st.markdown(f"{label} {title_text}")
 
