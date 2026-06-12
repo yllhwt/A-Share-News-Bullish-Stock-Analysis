@@ -212,28 +212,20 @@ if news_list:
             hint = f"历史: {'/'.join(kw_options[:2])}" if kw_options else ""
 
             kw_key = f"kw_val_{i}"
-            btn_key = f"btn_news_{i}"
             if kw_key not in st.session_state:
                 st.session_state[kw_key] = kw_options[0] if kw_options else ""
 
             # 关键词输入
-            ck1, ck2 = st.columns([2, 1])
-            with ck1:
-                kw = st.text_input(
-                    f"核心关键词（1-6字，默认取历史最多，可改）  {hint}",
-                    key=kw_key,
-                    placeholder="如：钼代钨",
-                )
-                if kw and len(kw) > 6:
-                    st.session_state[kw_key] = kw[:6]
-                    st.rerun()
-                if kw:
-                    st.session_state.news_keywords[n.get("title","")] = kw
-            with ck2:
-                if st.button("📰原文", key=btn_key, help="按新闻原文分析（不提取关键词）"):
-                    st.session_state[kw_key] = ""
-                    st.session_state.news_keywords[n.get("title","")] = ""
-                    st.rerun()
+            kw = st.text_input(
+                f"核心关键词（1-6字，默认取历史最多，可改）  {hint}",
+                key=kw_key,
+                placeholder="如：钼代钨",
+            )
+            if kw and len(kw) > 6:
+                st.session_state[kw_key] = kw[:6]
+                st.rerun()
+            if kw:
+                st.session_state.news_keywords[n.get("title","")] = kw
 
     selected_items = st.session_state.selected_news
     selected_count = len(selected_items)
