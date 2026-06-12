@@ -197,28 +197,29 @@ if news_list:
         title_text = n['title'][:70]
 
         checked = st.checkbox(f"{label} {title_text}", value=False, key=f"news_{i}")
-        if checked and url:
-            st.caption(f"📰 [查看原文]({url})")
 
         if checked and n not in st.session_state.selected_news:
             st.session_state.selected_news.append(n)
         elif not checked and n in st.session_state.selected_news:
             st.session_state.selected_news.remove(n)
 
-        # 勾选后直接在新闻下方弹出关键词输入
+        # 勾选后：原文链接 + 关键词同行
         if checked:
             top_kws = get_top_keywords(n.get("title",""), n.get("source",""), 3)
             kw_options = [kw for kw, _ in top_kws]
             hint = f"历史: {'/'.join(kw_options[:2])}" if kw_options else ""
 
-            # 关键词输入 + 按新闻分析按钮
             kw_key = f"kw_val_{i}"
             btn_key = f"btn_news_{i}"
             if kw_key not in st.session_state:
                 st.session_state[kw_key] = kw_options[0] if kw_options else ""
 
-            ck1, ck2 = st.columns([2, 1])
-            with ck1:
+            # 原文链接 + 关键词输入同行
+            c0, c1, c2 = st.columns([1.5, 2, 1])
+            with c0:
+                if url:
+                    st.caption(f"[📰原文]({url})")
+            with c1:
                 kw = st.text_input(
                     f"核心关键词（1-6字，默认取历史最多，可改）  {hint}",
                     key=kw_key,
