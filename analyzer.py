@@ -9,6 +9,7 @@ LLM 分析模块
 
 import json
 import os
+import hashlib
 from openai import OpenAI
 
 from app_config import (
@@ -19,7 +20,7 @@ from app_config import (
     DEBUG,
     COMPLIANCE_MODE,
 )
-from quota import get_cached_analysis, set_cached_analysis, get_cached_keyword, set_cached_keyword
+from quota import get_cached_analysis, set_cached_analysis, get_cached_keyword, set_cached_keyword, acquire_query_lock, release_query_lock, wait_and_check_cache
 
 # 懒加载客户端，避免 import 时因缺 key 崩溃
 _client = None
@@ -309,6 +310,19 @@ def analyze_news(news_item: dict, model: str = None, search_keyword: str = None)
             "tokens_out": cached["tokens_out"], "success": True, "error": None,
         }
 
+    # ── 并发锁：同关键词排队等结果 ──
+    lock_key = hashlib.md5(f"{title}|{news_item.get('source','')}".encode()).hexdigest()[:16]
+    if not acquire_query_lock(lock_key):
+        print(f"  [排队] 别人正在分析，等待中...")
+        waited = wait_and_check_cache(lock_key, title, news_item.get("source",""))
+        if waited:
+            print(f"  [排队] 已获取他人结果，免调API")
+            return {"news": news_item, "analysis": waited["analysis"],
+                    "model": model, "tokens_in": waited["tokens_in"],
+                    "tokens_out": waited["tokens_out"], "success": True, "error": None}
+        # 超时没等到，自己来
+        print(f"  [排队] 超时，自己分析")
+
     # ── 联网搜索（优先用用户关键词）──
     search_query = search_keyword.strip() if search_keyword else title
     search_context = ""
@@ -388,8 +402,10 @@ def analyze_news(news_item: dict, model: str = None, search_keyword: str = None)
         if search_keyword:
             set_cached_keyword(search_keyword, result["analysis"],
                               result["tokens_in"], result["tokens_out"])
+        release_query_lock(lock_key)
 
     except Exception as e:
+        release_query_lock(lock_key)
         result["error"] = str(e)
         if DEBUG:
             print(f"  [LLM 调用失败] {e}")

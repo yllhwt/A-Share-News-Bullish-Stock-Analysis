@@ -93,6 +93,7 @@ def get_quota(ip: str) -> dict:
 
     today = _today()
     conn = _db()
+    has_history = conn.execute("SELECT 1 FROM ip_quota WHERE ip=?", (ip,)).fetchone() is not None
     row = conn.execute("SELECT bonus, cache_used, fresh_used FROM ip_quota WHERE ip=? AND date=?", (ip, today)).fetchone()
     conn.close()
 
@@ -100,8 +101,7 @@ def get_quota(ip: str) -> dict:
     cache_used = row["cache_used"] if row else 0
     fresh_used = row["fresh_used"] if row else 0
 
-    # 首次登录给3次全新分析，之后每天0次
-    fresh_base = FREE_FRESH_NEW if not row else FREE_FRESH_DAILY
+    fresh_base = FREE_FRESH_NEW if not has_history else FREE_FRESH_DAILY
 
     cache_rem = max(0, FREE_CACHE - cache_used)
     fresh_rem = max(0, fresh_base + bonus - fresh_used)
@@ -117,6 +117,9 @@ def use_one(ip: str, fresh: bool = False) -> bool:
         return True
     today = _today()
     conn = _db()
+    # 先查历史（在插入今日行之前！）
+    has_history = conn.execute("SELECT 1 FROM ip_quota WHERE ip=?", (ip,)).fetchone() is not None
+
     row = conn.execute("SELECT bonus, cache_used, fresh_used FROM ip_quota WHERE ip=? AND date=?", (ip, today)).fetchone()
     if not row:
         conn.execute("INSERT INTO ip_quota (ip, date, bonus, cache_used, fresh_used) VALUES (?,?,0,0,0)", (ip, today))
@@ -125,9 +128,7 @@ def use_one(ip: str, fresh: bool = False) -> bool:
         bonus, cache_used, fresh_used = row["bonus"], row["cache_used"], row["fresh_used"]
 
     if fresh:
-        # 检查是否新用户（ip_quota 里从未出现过）
-        existing = conn.execute("SELECT 1 FROM ip_quota WHERE ip=?", (ip,)).fetchone()
-        fresh_base = FREE_FRESH_NEW if not existing else FREE_FRESH_DAILY
+        fresh_base = FREE_FRESH_NEW if not has_history else FREE_FRESH_DAILY
         if fresh_used >= fresh_base + bonus:
             conn.close()
             return False
@@ -482,6 +483,57 @@ def set_cached_analysis(title: str, source: str, analysis: str,
     )
     conn.commit()
     conn.close()
+
+
+# ═══════════════════════════════════════════════════
+# 并发锁：同关键词排队，后来者等先来者结果
+# ═══════════════════════════════════════════════════
+
+def _ensure_pending_table(conn):
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS pending_queries (
+            cache_key TEXT PRIMARY KEY,
+            status TEXT DEFAULT 'pending',
+            created_at TEXT NOT NULL
+        )
+    """)
+    conn.commit()
+
+
+def acquire_query_lock(cache_key: str) -> bool:
+    """尝试获取查询锁。返回 True 表示可以执行（你是第一个），False 表示别人在查"""
+    conn = _db()
+    _ensure_pending_table(conn)
+    try:
+        conn.execute("INSERT INTO pending_queries (cache_key, status, created_at) VALUES (?,?,?)",
+                     (cache_key, 'pending', datetime.now(TZ_BEIJING).isoformat()))
+        conn.commit()
+        return True
+    except sqlite3.IntegrityError:
+        return False
+    finally:
+        conn.close()
+
+
+def release_query_lock(cache_key: str):
+    """释放查询锁"""
+    conn = _db()
+    conn.execute("DELETE FROM pending_queries WHERE cache_key=?", (cache_key,))
+    conn.commit()
+    conn.close()
+
+
+def wait_and_check_cache(cache_key: str, title: str, source: str, timeout: int = 30):
+    """等待别人完成查询，然后从缓存读结果。最多等 timeout 秒"""
+    import time as _time
+    waited = 0
+    while waited < timeout:
+        _time.sleep(1)
+        waited += 1
+        cached = get_cached_analysis(title, source)
+        if cached:
+            return cached
+    return None
 
 
 # ═══════════════════════════════════════════════════
