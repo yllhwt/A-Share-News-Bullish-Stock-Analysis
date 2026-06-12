@@ -77,7 +77,7 @@ invite_code = st.query_params.get("invite", "")
 if invite_code and not st.session_state.invite_handled:
     if claim_invite_code(invite_code, user_key):
         st.session_state.invite_handled = True
-        st.toast(f"邀请码已使用！双方各得 +{INVITE_BONUS} 次")
+        st.toast(f"邀请码已使用！双方各得 +{INVITE_BONUS} 次全新分析")
 
 # ─── 额度 ───
 admin_on = st.query_params.get("admin", "") == ADMIN_PASSWORD
@@ -109,7 +109,7 @@ with st.sidebar:
         st.success("👑 VIP 无限")
     elif quota["is_new"]:
         st.success(f"🎁 每日免费看已有分析结果 {FREE_LIFETIME} 次")
-    st.caption(f"邀请奖励 +{quota['bonus']} 次 | 分享/看广告获取更多")
+    st.caption(f"全新分析次数 +{quota['bonus']} 次 | 分享/看广告可获取")
 
     # ── 打赏 ──
     st.divider()
@@ -122,13 +122,13 @@ with st.sidebar:
         with st.expander("🔄 获取更多次数", expanded=True):
             st.markdown("### 方式1: 分享链接")
             st.code(invite_link, language=None)
-            st.caption(f"朋友通过你的链接访问，双方各得 {INVITE_BONUS} 次")
+            st.caption(f"朋友通过你的链接访问，双方各得 {INVITE_BONUS} 次全新分析")
             st.caption("分享功能开发中")
 
             st.markdown("### 方式2: 看激励广告")
-            if st.button(f"📺 看广告得{AD_BONUS}次分析", use_container_width=True):
+            if st.button(f"📺 看广告得{AD_BONUS}次全新分析", use_container_width=True):
                 record_ad_view(user_key)
-                st.success(f"+{AD_BONUS}次！")
+                st.success(f"+{AD_BONUS}次全新分析！")
                 st.rerun()
 
     st.caption(f"你的标识: `{user_key[:12]}`")
