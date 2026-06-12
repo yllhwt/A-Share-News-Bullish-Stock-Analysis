@@ -114,9 +114,8 @@ with st.sidebar:
 
     # ── 打赏 ──
     st.divider()
-    with st.expander("☕ 感谢打赏"):
-        st.markdown("**感谢打赏，随机赠送分析次数，助力作者维护与后续开发**")
-        st.image("qr.png", use_container_width=True)
+    st.markdown("**☕ 感谢打赏，随机赠送分析次数，助力作者维护与后续开发**")
+    st.image("qr.png", use_container_width=True)
 
     # 额度用完
     if quota["remaining"] <= 0:
