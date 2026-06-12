@@ -236,7 +236,7 @@ if news_list:
                 status_text.text(f"用户额度用完！已分析 {i}/{total}")
                 break
 
-            if get_daily_cost() >= DAILY_COST_LIMIT:
+            if not admin_on and get_daily_cost() >= DAILY_COST_LIMIT:
                 status_text.text(f"今日 API 消费已达上限 ¥{DAILY_COST_LIMIT}，明天再来！")
                 break
 
