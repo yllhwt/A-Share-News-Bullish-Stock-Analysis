@@ -113,6 +113,8 @@ with st.sidebar:
     st.divider()
     st.markdown("**☕ 感谢打赏，随机赠送分析次数，助力作者维护与后续开发**")
     st.image("qr.png", use_container_width=True)
+    st.divider()
+    st.caption("📢 广告/商务合作：留言联系")
 
     # 额度用完
     if quota["remaining"] <= 0:
