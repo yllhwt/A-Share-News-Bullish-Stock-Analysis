@@ -157,7 +157,7 @@ if news_list:
         url = n.get("url", "")
 
         # 一行：红次数 + 复选框 + 链接
-        col1, col2, col3 = st.columns([3, 20, 1], vertical_alignment="center")
+        col1, col2, col3 = st.columns([3, 20, 1])
         with col1:
             if count > 0:
                 st.markdown(f"<span style='color:red;font-weight:bold'>{count}次</span>", unsafe_allow_html=True)
@@ -165,9 +165,6 @@ if news_list:
             label = f"{n.get('time','')} [{n['source']}] {n['title'][:65]}"
             checked = st.checkbox(label, value=False, key=f"news_{i}")
         with col3:
-            if url:
-                st.link_button("🔗", url)
-        with lk:
             if url:
                 st.link_button("🔗", url, help="查看原文")
 
