@@ -207,17 +207,21 @@ if news_list:
             kw_options = [kw for kw, _ in top_kws]
             default_kw = kw_options[0] if kw_options else ""
 
-            kw = st.text_input(
-                "请输入你认为的核心关键词（1-6字）",
-                value=st.session_state.news_keywords.get(n.get("title",""), default_kw),
-                max_chars=6,
-                placeholder="如：钼代钨",
-                key=f"kw_{i}",
-            )
-            if kw:
-                st.session_state.news_keywords[n.get("title","")] = kw
-            if kw_options:
-                st.caption(f"别人输过: {' / '.join(kw_options[:3])}")
+            col1, col2 = st.columns([1.5, 1])
+            with col1:
+                kw = st.text_input(
+                    "核心关键词",
+                    value=st.session_state.news_keywords.get(n.get("title",""), default_kw),
+                    max_chars=6,
+                    placeholder="1-6字，如：钼代钨",
+                    key=f"kw_{i}",
+                )
+                if kw:
+                    st.session_state.news_keywords[n.get("title","")] = kw
+            with col2:
+                if kw_options:
+                    st.selectbox("历史", kw_options, index=0, key=f"kwsel_{i}",
+                                 on_change=None)
 
     st.caption(f"已选择 {selected_count} 条 | 上限 {MAX_ANALYSIS_PER_DAY} | 剩余 {quota['remaining']}")
 
