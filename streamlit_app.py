@@ -58,12 +58,9 @@ button[kind="primary"]:hover { background-color: #E55D00 !important; }
 </style>
 """, unsafe_allow_html=True)
 
-# ─── 会话初始化 ───
-@st.cache_resource
 if "_client_id" not in st.session_state:
-    from streamlit.runtime.scriptrunner import get_script_run_ctx
-    ctx = get_script_run_ctx()
-    st.session_state._client_id = ctx.session_id if ctx else str(__import__('uuid').uuid4())[:12]
+    import uuid, hashlib, random
+    st.session_state._client_id = hashlib.md5(str(uuid.uuid4()).encode()).hexdigest()[:12]
 if "news_list" not in st.session_state:
     st.session_state.news_list = []
 if "results" not in st.session_state:
