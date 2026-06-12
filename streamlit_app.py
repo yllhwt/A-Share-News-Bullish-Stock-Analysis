@@ -2,7 +2,7 @@
 """
 A股利好新闻AI大模型分析（价格去问AI我不担责版）系统 — Hugging Face Spaces 版
 """
-import os, sys
+import os, sys, hashlib, time as _time
 import streamlit as st
 
 # ─── 把当前目录加入 path，确保能 import 同目录模块 ───
@@ -59,8 +59,13 @@ button[kind="primary"]:hover { background-color: #E55D00 !important; }
 """, unsafe_allow_html=True)
 
 if "_client_id" not in st.session_state:
-    import uuid, hashlib, random
-    st.session_state._client_id = hashlib.md5(str(uuid.uuid4()).encode()).hexdigest()[:12]
+    # 多熵源混合：os.urandom + 时间戳 + session_state对象ID（每会话不同，解决容器uuid不可靠问题）
+    _entropy = (
+        os.urandom(16).hex()
+        + str(_time.time())
+        + str(id(st.session_state))
+    )
+    st.session_state._client_id = hashlib.sha256(_entropy.encode()).hexdigest()[:16]
 if "news_list" not in st.session_state:
     st.session_state.news_list = []
 if "results" not in st.session_state:
