@@ -412,7 +412,7 @@ def analyze_news(news_item: dict, model: str = None, search_keyword: str = None)
                 {"role": "user", "content": prompt},
             ],
             temperature=0.3,
-            max_tokens=2048,
+            max_tokens=6144,
         )
         # 豆包 API 内置联网搜索，跳过外部搜索直接调
         if "doubao" in model:
