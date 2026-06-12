@@ -232,7 +232,7 @@ if news_list:
         total = selected_count
 
         for i, item in enumerate(selected_items):
-            if not use_one(user_key):
+            if not admin_on and not use_one(user_key):
                 status_text.text(f"用户额度用完！已分析 {i}/{total}")
                 break
 
@@ -263,12 +263,23 @@ if news_list:
         quota = get_quota(user_key)
         st.session_state.results = results
         st.session_state.selected_news = []
-        st.rerun()
 
-# ── 展示结果 ──
-results = st.session_state.results
+        # 直接展示结果
+        st.divider()
+        st.subheader("📊 分析结果")
+        for i, r in enumerate(results):
+            with st.expander(f"📊 新闻 {i+1}: {r['news']['title'][:50]}...", expanded=(i == 0)):
+                news = r["news"]
+                st.caption(f"来源: {news['source']} | {news.get('time','')} | [原文]({news.get('url','#')})")
+                if r["success"]:
+                    st.markdown(r["analysis"])
+                else:
+                    st.error(f"分析失败: {r.get('error','')}")
 
-if results:
+# ── 展示结果（从session恢复）──
+else:
+    results = st.session_state.results
+    if results:
     st.divider()
     st.subheader("📊 分析结果")
 
