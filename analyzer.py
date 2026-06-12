@@ -193,6 +193,16 @@ USER_PROMPT_TEMPLATE = """请分析以下财经新闻：
 
 {search_context}"""
 
+# 关键词模式下不传新闻内容，避免新闻原文污染分析方向
+USER_PROMPT_KEYWORD = """请分析以下产业关键词相关的A股上市公司：
+
+---
+核心关键词：{keyword}
+参考新闻：[{source}] {title}
+---
+
+{search_context}"""
+
 
 # ═══════════════════════════════════════════════════
 # 联网搜索（免费，无 API Key）
@@ -375,13 +385,21 @@ def analyze_news(news_item: dict, model: str = None, search_keyword: str = None)
         else:
             print(f"  [搜索] 无搜索结果，纯靠模型知识")
 
-    prompt = USER_PROMPT_TEMPLATE.format(
-        source=news_item.get("source", "未知"),
-        title=title,
-        summary=news_item.get("summary", "（无摘要）"),
-        url=news_item.get("url", ""),
-        search_context=search_context,
-    )
+    if search_keyword:
+        prompt = USER_PROMPT_KEYWORD.format(
+            keyword=search_keyword,
+            source=news_item.get("source", "未知"),
+            title=title,
+            search_context=search_context,
+        )
+    else:
+        prompt = USER_PROMPT_TEMPLATE.format(
+            source=news_item.get("source", "未知"),
+            title=title,
+            summary=news_item.get("summary", "（无摘要）"),
+            url=news_item.get("url", ""),
+            search_context=search_context,
+        )
 
     result = {
         "news": news_item,
@@ -408,13 +426,21 @@ def analyze_news(news_item: dict, model: str = None, search_keyword: str = None)
         if "doubao" in model:
             kwargs["extra_body"] = {"enable_search": True}
             # 豆包有搜索，不用额外注入搜索结果
-            kwargs["messages"][1]["content"] = USER_PROMPT_TEMPLATE.format(
-                source=news_item.get("source", "未知"),
-                title=title,
-                summary=news_item.get("summary", "（无摘要）"),
-                url=news_item.get("url", ""),
-                search_context="",
-            )
+            if search_keyword:
+                kwargs["messages"][1]["content"] = USER_PROMPT_KEYWORD.format(
+                    keyword=search_keyword,
+                    source=news_item.get("source", "未知"),
+                    title=title,
+                    search_context="",
+                )
+            else:
+                kwargs["messages"][1]["content"] = USER_PROMPT_TEMPLATE.format(
+                    source=news_item.get("source", "未知"),
+                    title=title,
+                    summary=news_item.get("summary", "（无摘要）"),
+                    url=news_item.get("url", ""),
+                    search_context="",
+                )
 
         response = client.chat.completions.create(**kwargs)
 

@@ -218,7 +218,7 @@ if news_list:
                 st.session_state[kw_key] = kw_options[0] if kw_options else ""
 
             kw = st.text_input(
-                f"核心关键词(1-6字)  {hint}",
+                f"核心关键词（1-6字，默认取历史最多，可改）  {hint}",
                 key=kw_key,
                 placeholder="如：钼代钨",
             )
