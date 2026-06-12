@@ -30,9 +30,30 @@ TZ_BEIJING = timezone(timedelta(hours=8))
 st.set_page_config(
     page_title="A股利好新闻AI大模型分析（豆包版）",
     page_icon="📰",
-    layout="wide",
+    layout="centered",
     initial_sidebar_state="collapsed",
 )
+
+# ── 手机端适配 ──
+st.markdown("""
+<style>
+@media (max-width: 768px) {
+    .stApp { padding: 0.3rem !important; }
+    h1 { font-size: 1.2rem !important; }
+    h2 { font-size: 1rem !important; }
+    h3 { font-size: 0.9rem !important; }
+    .stButton button { width: 100% !important; padding: 8px !important; font-size: 0.9rem !important; }
+    .stCheckbox label { font-size: 0.8rem !important; line-height: 1.3 !important; }
+    .stExpander { font-size: 0.85rem !important; }
+    .stWarning { font-size: 0.75rem !important; padding: 0.4rem !important; }
+    .stMarkdown table { font-size: 0.7rem !important; }
+}
+/* 表格自适应 */
+.stMarkdown table { display: block; overflow-x: auto; white-space: nowrap; max-width: 100%; }
+/* 按钮全宽 */
+div[data-testid="column"] .stButton button { width: 100%; }
+</style>
+""", unsafe_allow_html=True)
 
 # ─── 会话初始化 ───
 @st.cache_resource
