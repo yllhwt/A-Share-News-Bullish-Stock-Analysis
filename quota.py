@@ -13,7 +13,10 @@ import secrets
 from datetime import datetime, timezone, timedelta
 
 TZ_BEIJING = timezone(timedelta(hours=8))
-DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "quota.db")
+# HF Spaces 用 /data 持久化，本地用当前目录
+_DATA_DIR = os.environ.get("DATA_DIR", os.path.dirname(os.path.abspath(__file__)))
+os.makedirs(_DATA_DIR, exist_ok=True)
+DB_PATH = os.path.join(_DATA_DIR, "quota.db")
 
 # 配置
 FREE_LIFETIME = 1        # 新用户终身免费次数（仅首次）
@@ -314,6 +317,151 @@ def get_admin_stats(date_str: str = None) -> dict:
         "total_invites": total_invites,
         "total_ads": total_ads,
     }
+
+
+# ═══════════════════════════════════════════════════
+# 新闻抓取缓存（定时刷新，省 token）
+# ═══════════════════════════════════════════════════
+
+import json as _json
+
+REFRESH_TIMES = ["08:00", "12:30", "17:00"]
+NEWS_CACHE_DAYS = 2
+
+
+def _ensure_news_cache_table(conn):
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS news_cache (
+            date TEXT NOT NULL,
+            fetched_at TEXT NOT NULL,
+            news_json TEXT NOT NULL
+        )
+    """)
+    conn.commit()
+
+
+def get_cached_news(today: str):
+    """检查新闻缓存。返回 (新闻列表, 刷新时间) 或 (None, last_refresh) 表示需刷新"""
+    now = datetime.now(TZ_BEIJING)
+    current_time = now.strftime("%H:%M")
+    last_refresh = ""
+    for t in REFRESH_TIMES:
+        if current_time >= t:
+            last_refresh = t
+
+    conn = _db()
+    _ensure_news_cache_table(conn)
+    row = conn.execute(
+        "SELECT date, fetched_at, news_json FROM news_cache ORDER BY fetched_at DESC LIMIT 1"
+    ).fetchone()
+    conn.close()
+
+    if not row:
+        return None, last_refresh
+
+    from datetime import timedelta as _td
+    cutoff = (now - _td(days=NEWS_CACHE_DAYS)).strftime("%Y-%m-%d")
+    if row["date"] < cutoff:
+        return None, last_refresh
+
+    cache_date = row["date"]
+    cached_time = row["fetched_at"][:16]
+    if cache_date == today and last_refresh:
+        if cached_time < f"{today}T{last_refresh}":
+            return None, last_refresh
+
+    return _json.loads(row["news_json"]), last_refresh
+
+
+def set_cached_news(news_list: list):
+    """写入新闻缓存"""
+    today = datetime.now(TZ_BEIJING).strftime("%Y-%m-%d")
+    now = datetime.now(TZ_BEIJING).isoformat()
+    serializable = [{
+        "id": n.get("id", ""), "title": n.get("title", ""),
+        "summary": n.get("summary", ""), "source": n.get("source", ""),
+        "url": n.get("url", ""), "time": n.get("time", ""), "date": n.get("date", ""),
+    } for n in news_list]
+
+    conn = _db()
+    _ensure_news_cache_table(conn)
+    conn.execute("DELETE FROM news_cache WHERE date=?", (today,))
+    from datetime import timedelta as _td
+    cutoff = (datetime.now(TZ_BEIJING) - _td(days=NEWS_CACHE_DAYS + 1)).strftime("%Y-%m-%d")
+    conn.execute("DELETE FROM news_cache WHERE date < ?", (cutoff,))
+    conn.execute(
+        "INSERT INTO news_cache (date, fetched_at, news_json) VALUES (?,?,?)",
+        (today, now, _json.dumps(serializable, ensure_ascii=False))
+    )
+    conn.commit()
+    conn.close()
+
+
+# ═══════════════════════════════════════════════════
+# 分析结果缓存
+# ═══════════════════════════════════════════════════
+
+def _ensure_analysis_cache_table(conn):
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS analysis_cache (
+            cache_key TEXT PRIMARY KEY,
+            news_title TEXT NOT NULL,
+            news_source TEXT NOT NULL,
+            analysis TEXT NOT NULL,
+            tokens_in INTEGER DEFAULT 0,
+            tokens_out INTEGER DEFAULT 0,
+            hit_count INTEGER DEFAULT 1,
+            created_at TEXT NOT NULL,
+            last_hit TEXT NOT NULL
+        )
+    """)
+    conn.commit()
+
+
+def get_cached_analysis(title: str, source: str):
+    """查缓存，命中返回结果，未命中返回 None"""
+    import hashlib
+    key = hashlib.md5(f"{source}|{title}".encode()).hexdigest()
+    conn = _db()
+    _ensure_analysis_cache_table(conn)
+    row = conn.execute(
+        "SELECT analysis, tokens_in, tokens_out, hit_count FROM analysis_cache WHERE cache_key=?",
+        (key,)
+    ).fetchone()
+    if row:
+        conn.execute(
+            "UPDATE analysis_cache SET hit_count=hit_count+1, last_hit=? WHERE cache_key=?",
+            (datetime.now(TZ_BEIJING).isoformat(), key)
+        )
+        conn.commit()
+        conn.close()
+        return {
+            "analysis": row["analysis"],
+            "tokens_in": row["tokens_in"],
+            "tokens_out": row["tokens_out"],
+            "hit_count": row["hit_count"] + 1,
+            "cached": True,
+        }
+    conn.close()
+    return None
+
+
+def set_cached_analysis(title: str, source: str, analysis: str,
+                        tokens_in: int, tokens_out: int):
+    """存入缓存"""
+    import hashlib
+    key = hashlib.md5(f"{source}|{title}".encode()).hexdigest()
+    now = datetime.now(TZ_BEIJING).isoformat()
+    conn = _db()
+    _ensure_analysis_cache_table(conn)
+    conn.execute(
+        "INSERT OR REPLACE INTO analysis_cache "
+        "(cache_key, news_title, news_source, analysis, tokens_in, tokens_out, created_at, last_hit) "
+        "VALUES (?,?,?,?,?,?,?,?)",
+        (key, title, source, analysis, tokens_in, tokens_out, now, now)
+    )
+    conn.commit()
+    conn.close()
 
 
 # ═══════════════════════════════════════════════════

@@ -19,16 +19,15 @@ if os.path.exists(_ENV_FILE):
                 os.environ.setdefault(_key, _val)
 
 # ==================== API 密钥 ====================
-# DeepSeek API — 优先级：环境变量 > .env 文件
-# 获取 key: https://platform.deepseek.com/api_keys
+# 豆包 API (火山引擎) — 优先级：环境变量 > .env 文件
+# 获取 key: https://console.volcengine.com/ark → 开通豆包模型
 DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
-DEEPSEEK_BASE_URL = "https://api.deepseek.com"
-DEEPSEEK_MODEL = "deepseek-chat"  # V3 模型，便宜好用
+DEEPSEEK_BASE_URL = "https://ark.cn-beijing.volces.com/api/v3"
+DEEPSEEK_MODEL = "doubao-seed-2-0-lite-260428"  # 豆包 Lite 完整模型名
 
-# 备用：通义千问 / OpenAI / Claude 等兼容接口
-# LLM_API_KEY = os.environ.get("LLM_API_KEY", "")
-# LLM_BASE_URL = "https://api.openai.com/v1"
-# LLM_MODEL = "gpt-4o"
+# 切回 DeepSeek 只需改下面两行：
+# DEEPSEEK_BASE_URL = "https://api.deepseek.com"
+# DEEPSEEK_MODEL = "deepseek-chat"
 
 # ==================== 新闻源配置 ====================
 # 注：部分 RSS 源可能因反爬机制失效，可自行增减

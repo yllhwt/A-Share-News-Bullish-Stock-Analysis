@@ -19,6 +19,7 @@ from app_config import (
     DEBUG,
     COMPLIANCE_MODE,
 )
+from quota import get_cached_analysis, set_cached_analysis
 
 # 懒加载客户端，避免 import 时因缺 key 崩溃
 _client = None
@@ -47,65 +48,64 @@ def _get_client():
 # Prompt 模板
 # ═══════════════════════════════════════════════════
 
-SYSTEM_PROMPT = """你是一位资深的A股市场分析师，专门从财经新闻中识别投资机会。
+SYSTEM_PROMPT = """你是一位资深A股产业链分析师，专门从财经新闻中识别投资机会并映射受益上市公司。
 
-你的任务：分析用户提供的财经新闻，输出结构化的分析报告。
+## 核心任务
+
+分析新闻 → 联网搜索验证 → 输出"有订单/业绩支撑的龙头"和"概念跟风"两类公司 → 给出基于产业逻辑的三段价格预期。
 
 ## 分析要求
 
-1. **利好识别**：识别新闻中的实质性利好因素，区分"真利好"（业绩/订单/政策落地）和"情绪利好"（题材炒作/传闻）
-2. **可信度评估**：基于信息来源、信息具体程度、可验证性，给出1-10分的可信度评分
-3. **公司映射**：找出受此新闻影响的A股上市公司，按受益程度分为三类：
-   - [龙头]：行业龙头、市场份额第一梯队、最直接受益
-   - [有订单]：已公告相关订单、产能、或主营业务高度相关
-   - [概念跟风]：仅沾边概念、暂无实质业绩支撑（需标注"谨慎"）
-4. **价格预期**：先给出当前股价（近5个交易日均价），再给出三段位市场共识预期价格（保守/中性/乐观），基于行业估值水平、历史波动区间、以及该利好对业绩的潜在增厚幅度估算。注意：预期价格是**未来3-6个月**的目标价区间
+1. **利好识别**：区分"真利好"（业绩/订单/政策落地/产业拐点）和"情绪利好"（题材炒作/传闻）
+2. **可信度评估**：基于信息来源权威性、信息具体程度、多方交叉验证，给出1-10分
+3. **公司分类**（仅两类）：
+   - **有订单或业绩的龙头**：有实质订单、产能落地、客户认证、营收占比较高，受益逻辑明确
+   - **概念跟风**：沾边概念但无实质业绩支撑、或仅处于送样/认证早期阶段、或受益逻辑间接
+4. **公司描述要求**：每家公司必须写明具体受益逻辑——哪个子公司/产品线、认证了哪些客户、订单规模/产能情况、与新闻主题的具体关联。不允许笼统描述
+5. **价格预期**：先给当前股价（近5日均价），再给保守/中性/乐观三段目标价（基于产业节点、行业估值、利好增厚幅度）。每段价格需附带一句话逻辑说明
 
 ## 输出格式（严格遵守）
 
 ```
 ## 新闻摘要
-[一句话概括新闻核心内容]
+[一句话概括]
 
 ## 利好评估
 - **利好等级**：[1-10] 分
 - **可信度**：[1-10] 分
-- **利好类型**：实质利好 / 情绪催化 / 政策驱动 / 行业拐点
+- **利好类型**：实质利好 / 情绪催化 / 政策驱动 / 产业拐点
 - **影响周期**：短期(1-3天) / 中期(1-4周) / 长期(1月+)
-- **评估理由**：[2-3句话说明]
+- **评估理由**：[2-3句话]
 
-## [龙头] 直接受益
-| 代码 | 名称 | 受益逻辑 | 现价 | 市场共识预期价 |
-|------|------|---------|------|---------------|
-| 000000 | XX股份 | 一句话说明为什么受益 | 约X元 | 保守X元 / 中性X元 / 乐观X元 |
+## 一、有订单或业绩的龙头
 
-（如果没有明确的龙头公司，写"无"）
+| 代码 | 名称 | 受益逻辑 | 现价 | 保守目标价 | 中性目标价 | 乐观目标价 |
+|------|------|---------|------|-----------|-----------|-----------|
+| 000000 | XX股份 | 子公司XXX是国内XX龙头，已通过XX客户认证，批量供货XX，直接受益于本次XX需求增量，量价齐升逻辑明确 | 约X元 | X元（短期XX驱动） | X元（中期XX兑现） | X元（长期XX爆发） |
 
-## [有订单] 实质性业务/订单
-| 代码 | 名称 | 受益逻辑 | 现价 | 市场共识预期价 |
-|------|------|---------|------|---------------|
-（同上，1-3家公司）
+（3-6家，找不到则写"暂无符合条件的公司"）
 
-## [概念跟风] 谨慎参与
-| 代码 | 名称 | 受益逻辑 | 现价 | 市场共识预期价 |
-|------|------|---------|------|---------------|
-（同上，0-2家公司）
+## 二、概念跟风类
+
+| 代码 | 名称 | 受益逻辑 | 现价 | 保守目标价 | 中性目标价 | 乐观目标价 |
+|------|------|---------|------|-----------|-----------|-----------|
+| 000000 | XX股份 | 拥有XX产能/资源，但暂无直接订单或认证，受益逻辑偏间接 | 约X元 | X元 | X元 | X元 |
+
+（2-4家，找不到则写"暂无"）
 
 ## 风险提示
-- [该利好可能落空的风险点]
-- [信息不确定性的来源]
-- [市场已经price-in的可能]
+- [利好落空的风险点]
+- [信息不确定性来源]
+- [市场已price-in的可能]
 ```
 
-## 重要规则
+## 铁律
 
-- 如果无法确定具体受益公司，诚实地说"暂无明确的A股直接受益标的"，不要编造
-- 股票代码必须6位数字，格式如 000657.SZ 或 600519.SH
-- **现价**尽量从联网搜索结果中获取最新股价；如果搜不到，标注"暂未获取"
-- 预期价格必须是具体数字（元），不要写范围区间。保守/中性/乐观是三个独立数字
+- **绝对禁止编造**：股票代码、公司名称、订单、认证状态必须来自联网搜索结果。搜不到的诚实写"暂无"
+- 股票代码6位数字，格式 000657.SZ 或 600519.SH
+- 预期价格为具体数字（元），非范围区间。保守/中性/乐观是三个独立数字，每段附带一句话逻辑
 - 所有价格以人民币元为单位
-- 如果新闻与A股完全无关或没有投资价值，直接说"该新闻对A股无明显利好"并结束分析
-- **不要编造股票代码。如果无法确定，诚实告知。**"""
+- 新闻与A股完全无关 → 直接说"该新闻对A股无明显利好"并结束"""
 
 
 SYSTEM_PROMPT_COMPLIANCE = """你是一位财经新闻分析助手，专门为普通投资者解读产业新闻的市场含义。
@@ -232,7 +232,34 @@ def search_company_context(title: str, max_results: int = 6) -> str:
         pass
 
     if not all_snippets:
-        # DuckDuckGo 失败时，用 requests 尝试 Bing
+        # DuckDuckGo 失败，用百度搜（A股信息更准）
+        try:
+            import requests as _req
+            headers = {
+                "User-Agent": (
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/125.0.0.0 Safari/537.36"
+                ),
+                "Accept-Language": "zh-CN,zh;q=0.9",
+            }
+            for sq in searches[:1]:
+                url = f"https://www.baidu.com/s?wd={_req.utils.quote(sq)}"
+                resp = _req.get(url, headers=headers, timeout=10)
+                if resp.status_code == 200:
+                    from bs4 import BeautifulSoup
+                    soup = BeautifulSoup(resp.text, "html.parser")
+                    for tag in soup.select(".result")[:max_results]:
+                        title_tag = tag.select_one("h3")
+                        desc_tag = tag.select_one(".c-abstract")
+                        text = f"- {title_tag.get_text(strip=True) if title_tag else ''}: "
+                        text += desc_tag.get_text(strip=True)[:200] if desc_tag else ""
+                        all_snippets.append(text)
+        except Exception:
+            pass
+
+    if not all_snippets:
+        # 百度不行再试 Bing
         try:
             import requests as _req
             headers = {
@@ -246,7 +273,6 @@ def search_company_context(title: str, max_results: int = 6) -> str:
                 url = f"https://www.bing.com/search?q={_req.utils.quote(sq)}"
                 resp = _req.get(url, headers=headers, timeout=10)
                 if resp.status_code == 200:
-                    # 简单提取文本片段
                     from bs4 import BeautifulSoup
                     soup = BeautifulSoup(resp.text, "html.parser")
                     for tag in soup.select("li.b_algo")[:max_results]:
@@ -306,9 +332,24 @@ def analyze_news(news_item: dict, model: str = None) -> dict:
     if model is None:
         model = DEEPSEEK_MODEL
 
-    # 联网搜索：先搜出相关公司信息，再喂给 LLM
-    search_context = ""
     title = news_item.get("title", "")
+
+    # ── 缓存检查 ──
+    cached = get_cached_analysis(title, news_item.get("source", ""))
+    if cached:
+        print(f"  [缓存命中] {title[:40]}... (第{cached['hit_count']}次，0 token)")
+        return {
+            "news": news_item,
+            "analysis": cached["analysis"],
+            "model": model,
+            "tokens_in": cached["tokens_in"],
+            "tokens_out": cached["tokens_out"],
+            "success": True,
+            "error": None,
+        }
+
+    # ── 联网搜索 ──
+    search_context = ""
     if title:
         print(f"  [搜索] 正在联网搜索相关公司: {title[:40]}...")
         search_context = search_company_context(title)
@@ -337,20 +378,35 @@ def analyze_news(news_item: dict, model: str = None) -> dict:
 
     try:
         client = _get_client()
-        response = client.chat.completions.create(
+        kwargs = dict(
             model=model,
             messages=[
                 {"role": "system", "content": _get_system_prompt()},
                 {"role": "user", "content": prompt},
             ],
-            temperature=0.3,  # 低温度，保证输出稳定
+            temperature=0.3,
             max_tokens=2048,
         )
+        # 豆包 API 内置联网搜索，跳过外部搜索直接调
+        if "doubao" in model:
+            kwargs["extra_body"] = {"enable_search": True}
+            # 豆包有搜索，不用额外注入搜索结果
+            kwargs["messages"][1]["content"] = USER_PROMPT_TEMPLATE.format(
+                source=news_item.get("source", "未知"),
+                title=title,
+                summary=news_item.get("summary", "（无摘要）"),
+                url=news_item.get("url", ""),
+                search_context="",
+            )
+
+        response = client.chat.completions.create(**kwargs)
 
         result["analysis"] = response.choices[0].message.content
         result["tokens_in"] = response.usage.prompt_tokens
         result["tokens_out"] = response.usage.completion_tokens
         result["success"] = True
+        set_cached_analysis(title, news_item.get("source", ""),
+                           result["analysis"], result["tokens_in"], result["tokens_out"])
 
     except Exception as e:
         result["error"] = str(e)

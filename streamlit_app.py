@@ -113,6 +113,42 @@ with st.sidebar:
 st.title("📰 A股利好新闻分析系统")
 st.caption("抓取财经新闻 → 筛选 → AI 分析利好 + 映射上市公司 + 预期价格")
 
+# ── 手动模式：贴豆包搜索的公司结果，跳过搜索直接用 DeepSeek 格式化+加价格 ──
+with st.expander("✏️ 手动模式：贴豆包搜索结果（不用联网搜索，直达价格分析）", expanded=False):
+    manual_title = st.text_input("新闻标题", placeholder="例如：六氟化钨海外断供")
+    manual_text = st.text_area(
+        "粘贴豆包搜索的公司结果",
+        placeholder="直接把豆包搜到的公司名单贴过来...\n\n例：\n中船特气（688146）：核心龙头，六氟化钨营收占比高...\n昊华科技（600378）：子公司昊华气体具备规模化产能...",
+        height=200
+    )
+    col_m1, col_m2 = st.columns([1, 3])
+    with col_m1:
+        btn_manual = st.button("🚀 直接分析", type="primary", use_container_width=True)
+    with col_m2:
+        if btn_manual and manual_title and manual_text:
+            if not use_one(user_key):
+                st.error("额度不足！")
+            elif get_daily_cost() >= DAILY_COST_LIMIT:
+                st.error(f"今日消费已达上限")
+            else:
+                with st.spinner("正在分析..."):
+                    synthetic_news = {
+                        "title": manual_title,
+                        "summary": manual_text[:200],
+                        "source": "豆包搜索",
+                        "url": "",
+                    }
+                    result = analyze_news(synthetic_news)
+                    if result["success"]:
+                        record_api_usage(user_key, result["tokens_in"], result["tokens_out"])
+                        quota = get_quota(user_key)
+                        st.session_state.results = [result]
+                        st.rerun()
+                    else:
+                        st.error(f"分析失败: {result.get('error','')}")
+        elif btn_manual:
+            st.warning("请填写新闻标题和公司结果")
+
 col1, col2, col3 = st.columns([1, 1, 4])
 with col1:
     btn_fetch = st.button("🔍 抓取新闻", use_container_width=True, type="primary")

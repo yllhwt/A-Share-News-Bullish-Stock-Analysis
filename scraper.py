@@ -452,15 +452,27 @@ def ai_filter_news(news_list, model=None):
 
 
 def fetch_today_news(limit_per_source=30, ai_filter=False):
-    """快捷方法：抓取今日新闻（自动过滤）"""
-    print("[抓取] 正在抓取财经新闻...")
+    """快捷方法：抓取今日新闻（带缓存，8:00/12:30/17:00 定时刷新）"""
+    from quota import get_cached_news, set_cached_news
+    today = datetime.now(TZ_BEIJING).strftime("%Y-%m-%d")
+
+    cached, refresh_point = get_cached_news(today)
+    if cached is not None:
+        print(f"[缓存] 新闻缓存有效 (刷新点: {refresh_point})，共 {len(cached)} 条")
+        return cached
+
+    print(f"[抓取] 缓存过期 (刷新点: {refresh_point})，重新抓取...")
     items = fetch_all_news(limit_per_source=limit_per_source, a_stock_filter=True)
     print(f"[抓取] 关键词过滤后共 {len(items)} 条")
 
     if ai_filter and items:
         items = ai_filter_news(items)
 
-    print(f"[OK] 最终 {len(items)} 条 A股/产业相关新闻\n")
+    if items:
+        set_cached_news(items)
+        print(f"[缓存] 已写入缓存")
+
+    print(f"[OK] 最终 {len(items)} 条\n")
     return items
 
 
