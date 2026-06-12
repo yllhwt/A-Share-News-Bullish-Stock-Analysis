@@ -267,6 +267,7 @@ if news_list:
 
 # ── 展示结果 ──
 results = st.session_state.results
+st.write(f"DEBUG: results={len(results) if results else 0}, news={len(news_list)}, sel={len(st.session_state.selected_news)}")
 
 if results:
     st.divider()
