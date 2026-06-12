@@ -339,7 +339,7 @@ if results:
 - 禁止编造，搜不到的诚实写"暂无"
 - 客观、简洁，每家公司一行"""
 
-    st.text_area("📋 全选复制后去下方AI平台粘贴", full_copy, height=250)
+    st.code(full_copy, language=None)
     c1, c2 = st.columns(2)
     c1.link_button("🚀 去 DeepSeek 粘贴", "https://chat.deepseek.com/", use_container_width=True)
     c2.link_button("🚀 去豆包粘贴", "https://www.doubao.com/", use_container_width=True)
