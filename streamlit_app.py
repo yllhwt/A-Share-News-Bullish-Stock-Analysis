@@ -99,7 +99,6 @@ invite_link = "分享功能开发中"
 with st.sidebar:
     st.title("📰 设置")
 
-    max_news = st.slider("每源抓取条数", 10, 50, 30)
 
     st.divider()
     st.subheader("🎯 免费额度")
@@ -158,7 +157,7 @@ if btn_clear:
 # ── 抓取 ──
 if btn_fetch:
     with st.spinner("正在抓取财经新闻..."):
-        kept, dropped = fetch_today_news(limit_per_source=max_news, ai_filter=True)
+        kept, dropped = fetch_today_news(limit_per_source=30, ai_filter=True)
         st.session_state.news_list = kept
         st.session_state.dropped_news = dropped
         st.session_state.results = []
