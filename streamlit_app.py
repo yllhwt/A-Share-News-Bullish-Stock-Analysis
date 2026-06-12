@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-A股利好新闻分析系统 — Hugging Face Spaces 版
+A股利好新闻AI大模型分析（豆包版）系统 — Hugging Face Spaces 版
 """
 import os, sys
 import streamlit as st
@@ -28,7 +28,7 @@ from datetime import datetime, timezone, timedelta
 TZ_BEIJING = timezone(timedelta(hours=8))
 
 st.set_page_config(
-    page_title="A股利好新闻分析",
+    page_title="A股利好新闻AI大模型分析（豆包版）",
     page_icon="📰",
     layout="wide",
     initial_sidebar_state="collapsed",
@@ -110,7 +110,7 @@ with st.sidebar:
 # 主页面
 # ═══════════════════════════════════════════════════
 
-st.title("📰 A股利好新闻分析系统")
+st.title("📰 A股利好新闻AI大模型分析（豆包版）系统")
 st.caption("抓取财经新闻 → 筛选 → AI 分析利好 + 映射上市公司 + 预期价格")
 
 col1, col2, col3 = st.columns([1, 1, 4])
@@ -267,7 +267,7 @@ if results:
     # 导出
     st.divider()
     date_str = datetime.now(TZ_BEIJING).strftime("%Y-%m-%d")
-    report_lines = [f"# A股利好新闻分析报告 — {date_str}\n"]
+    report_lines = [f"# A股利好新闻AI大模型分析（豆包版）报告 — {date_str}\n"]
     report_lines.append(f"> 模型: {DEEPSEEK_MODEL}\n\n---\n")
     for i, r in enumerate(results, 1):
         news = r["news"]
