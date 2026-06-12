@@ -335,14 +335,14 @@ if results:
 
 规则：
 - 现价取最新收盘价，保守/中性/乐观基于行业估值+基本面+近期催化
-- 价格来源标注券商名，搜不到可结合市场信息推算并标"AI推算价"
+- 价格来源标注券商名，搜不到可结合市场信息推算并标"AI推算价（方法：PE/行业对比等）"
 - 禁止编造，确实无法推算的写"暂无"
 - 客观、简洁，每家公司一行"""
 
     st.code(full_copy, language=None)
     c1, c2 = st.columns(2)
-    c1.link_button("🚀 去 DeepSeek 粘贴", "https://chat.deepseek.com/", use_container_width=True)
-    c2.link_button("🚀 去豆包粘贴", "https://www.doubao.com/", use_container_width=True)
+    c1.markdown('<a href="https://chat.deepseek.com/" target="_blank" style="text-decoration:none;color:white;background:#4A90D9;padding:8px 16px;border-radius:6px;display:inline-block">🚀 去 DeepSeek</a>', unsafe_allow_html=True)
+    c2.markdown('<a href="https://www.doubao.com/" target="_blank" style="text-decoration:none;color:white;background:#07C160;padding:8px 16px;border-radius:6px;display:inline-block">🚀 去豆包</a>', unsafe_allow_html=True)
     st.caption("👆 全选→复制→打开 AI 平台→粘贴→获得价格分析。本平台不提供价格预测。")
 
 
