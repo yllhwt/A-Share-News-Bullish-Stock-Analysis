@@ -158,13 +158,13 @@ if news_list:
         count = get_news_analysis_count(n.get("title",""), n.get("source",""))
         url = n.get("url", "")
 
-        ck, ct, lk = st.columns([8, 4, 1])
-        with ck:
-            label = f"{n.get('time','')} [{n['source']}] {n['title'][:55]}"
-            checked = st.checkbox(label, value=all_checked, key=f"news_{i}")
+        ct, ck, lk = st.columns([2, 10, 1])
         with ct:
             if count > 0:
-                st.markdown(f"**:red[（今日已被分析{count}次）]**")
+                st.markdown(f"**:red[（{count}次）]**")
+        with ck:
+            label = f"{n.get('time','')} [{n['source']}] {n['title'][:60]}"
+            checked = st.checkbox(label, value=all_checked, key=f"news_{i}")
         with lk:
             if url:
                 st.link_button("🔗", url, help="查看原文")
