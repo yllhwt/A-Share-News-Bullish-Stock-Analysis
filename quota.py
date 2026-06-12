@@ -41,15 +41,22 @@ def _db():
 def init():
     """初始化数据库表"""
     conn = _db()
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS ip_quota (
-            ip TEXT NOT NULL,
-            date TEXT NOT NULL,
-            bonus INTEGER DEFAULT 0,
-            used INTEGER DEFAULT 0,
-            PRIMARY KEY (ip, date)
-        )
-    """)
+    # 检查旧表结构，如有冲突自动迁移
+    cur = conn.execute("PRAGMA table_info(ip_quota)")
+    cols = [r[1] for r in cur.fetchall()]
+    if cols and "date" not in cols:
+        conn.execute("DROP TABLE ip_quota")
+        cols = []
+    if not cols:
+        conn.execute("""
+            CREATE TABLE ip_quota (
+                ip TEXT NOT NULL,
+                date TEXT NOT NULL,
+                bonus INTEGER DEFAULT 0,
+                used INTEGER DEFAULT 0,
+                PRIMARY KEY (ip, date)
+            )
+        """)
     conn.execute("""
         CREATE TABLE IF NOT EXISTS invite_codes (
             code TEXT PRIMARY KEY,
