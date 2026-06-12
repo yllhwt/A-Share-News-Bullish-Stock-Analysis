@@ -223,6 +223,8 @@ if news_list:
                     st.selectbox("历史", kw_options, index=0, key=f"kwsel_{i}",
                                  on_change=None)
 
+    selected_items = st.session_state.selected_news
+    selected_count = len(selected_items)
     st.caption(f"已选择 {selected_count} 条 | 上限 {MAX_ANALYSIS_PER_DAY} | 剩余 {quota['remaining']}")
 
     over_quota = selected_count > quota["remaining"]
