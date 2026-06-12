@@ -10,6 +10,7 @@ LLM 分析模块
 import json
 import os
 import hashlib
+from datetime import datetime, timezone, timedelta
 from openai import OpenAI
 
 from app_config import (
@@ -48,7 +49,19 @@ def _get_client():
 # Prompt 模板
 # ═══════════════════════════════════════════════════
 
-SYSTEM_PROMPT = """你是A股产业链分析师。请联网搜索最新资料，按产业链环节尽可能全面列出所有相关A股公司（代码+名称+细分环节+受益逻辑），给出风险提示。禁止编造。"""
+TZ_BEIJING = timezone(timedelta(hours=8))
+
+_today_str_cache = {"date": "", "value": ""}
+
+def _get_today_str():
+    """每天只算一次日期字符串，避免重复调用 datetime.now()"""
+    d = datetime.now(TZ_BEIJING).strftime("%Y-%m-%d")
+    if _today_str_cache["date"] != d:
+        _today_str_cache["date"] = d
+        _today_str_cache["value"] = datetime.now(TZ_BEIJING).strftime("%Y-%m-%d %A")
+    return _today_str_cache["value"]
+
+SYSTEM_PROMPT = """你是A股产业链分析师。当前日期：{today}。请联网搜索最新资料，按产业链环节尽可能全面列出所有相关A股公司（代码+名称+细分环节+受益逻辑），给出风险提示。禁止编造。"""
 
 
 
@@ -296,10 +309,11 @@ def analyze_news(news_item: dict, model: str = None, search_keyword: str = None)
 
     try:
         client = _get_client()
+        today_str = _get_today_str()
         kwargs = dict(
             model=model,
             messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "system", "content": SYSTEM_PROMPT.format(today=today_str)},
                 {"role": "user", "content": prompt},
             ],
             temperature=0.5,
