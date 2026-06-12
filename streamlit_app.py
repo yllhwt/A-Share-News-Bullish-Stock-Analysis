@@ -196,14 +196,9 @@ if news_list:
         label = f":{cname}[{prefix}{n.get('time','')} [{n['source']}]]" if count > 0 else f"{prefix}{n.get('time','')} [{n['source']}]"
         title_text = n['title'][:70]
 
-        c1, c2 = st.columns([0.5, 20])
-        with c1:
-            checked = st.checkbox(" ", value=False, key=f"news_{i}")
-        with c2:
-            if url:
-                st.markdown(f'{label} <a href="{url}" target="_blank">{title_text}</a>', unsafe_allow_html=True)
-            else:
-                st.markdown(f"{label} {title_text}")
+        checked = st.checkbox(f"{label} {title_text}", value=False, key=f"news_{i}")
+        if checked and url:
+            st.caption(f"📰 [查看原文]({url})")
 
         if checked and n not in st.session_state.selected_news:
             st.session_state.selected_news.append(n)
