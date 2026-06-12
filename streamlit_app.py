@@ -142,6 +142,12 @@ if btn_fetch:
 news_list = st.session_state.news_list
 
 if news_list:
+    st.warning(
+        "**本程序非炒股建议**，仅作为已有券商研报信息或AI分析信息分享，"
+        "全程为AI自动化运行，无任何人工干预。预期的保守/中性/乐观价也与程序开发者无任何关系。"
+        "投资有风险，入市须谨慎。",
+        icon="⚠️"
+    )
     st.subheader(f"📋 今日新闻 ({len(news_list)} 条)")
 
     from quota import get_news_analysis_count, get_top_keywords, save_keyword, log_news_analysis
@@ -312,10 +318,17 @@ if admin_param == ADMIN_PASSWORD:
     pct = min(100, stats["today_cost"] / DAILY_COST_LIMIT * 100)
     st.progress(int(pct), text=f"消费进度: ¥{stats['today_cost']:.4f} / ¥{DAILY_COST_LIMIT:.0f}")
 
-    if st.button("♻ 重置所有人免费次数"):
-        from quota import reset_all_quota
-        n = reset_all_quota()
-        st.success(f"已重置 {n} 个用户")
+    col_a, col_b = st.columns(2)
+    with col_a:
+        if st.button("♻ 重置所有人免费次数", use_container_width=True):
+            from quota import reset_all_quota
+            n = reset_all_quota()
+            st.success(f"已重置 {n} 个用户")
+    with col_b:
+        if st.button("🗑 清空当日分析缓存", use_container_width=True):
+            from quota import clear_today_cache
+            n = clear_today_cache()
+            st.success(f"已清空 {n} 条今日缓存，重新抓新闻即可重分析")
 
 st.divider()
 st.caption("免责声明：AI 生成内容不构成投资建议。投资有风险，入市须谨慎。")

@@ -620,6 +620,19 @@ def reset_all_quota():
     return count
 
 
+def clear_today_cache():
+    """清空当日分析缓存（关键词、分析结果、分析日志），方便重新分析"""
+    today = datetime.now(TZ_BEIJING).strftime("%Y-%m-%d")
+    conn = _db()
+    n = 0
+    n += conn.execute("DELETE FROM keyword_cache WHERE date=?", (today,)).rowcount
+    n += conn.execute("DELETE FROM analysis_cache WHERE last_hit LIKE ?", (f"{today}%",)).rowcount
+    n += conn.execute("DELETE FROM news_analysis_log WHERE date=?", (today,)).rowcount
+    conn.commit()
+    conn.close()
+    return n
+
+
 # ═══════════════════════════════════════════════════
 # 初始化
 # ═══════════════════════════════════════════════════
