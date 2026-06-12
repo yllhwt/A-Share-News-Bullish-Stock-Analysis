@@ -51,7 +51,7 @@ st.markdown("""
 /* 表格自适应 */
 .stMarkdown table { display: block; overflow-x: auto; white-space: nowrap; max-width: 100%; }
 /* 按钮全宽 */
-div[data-testid="column"] .stButton button { width: 100%; }
+.stLinkButton { margin-top: 0.3rem; }
 </style>
 """, unsafe_allow_html=True)
 
