@@ -300,7 +300,7 @@ def get_admin_stats(date_str: str = None) -> dict:
 
     # 今日独立用户
     row = conn.execute(
-        "SELECT COUNT(DISTINCT ip) AS cnt FROM api_usage WHERE date=?", (date_str,)
+        "SELECT COUNT(DISTINCT ip) AS cnt FROM ip_quota WHERE date=?", (date_str,)
     ).fetchone()
     today_users = row["cnt"]
 
@@ -312,7 +312,7 @@ def get_admin_stats(date_str: str = None) -> dict:
     today_tokens = (row["tin"] + row["tout"])
 
     # 累计统计
-    row = conn.execute("SELECT COUNT(DISTINCT ip) FROM api_usage").fetchone()
+    row = conn.execute("SELECT COUNT(DISTINCT ip) FROM ip_quota").fetchone()
     total_users = row[0]
 
     row = conn.execute("SELECT COALESCE(SUM(cost_rmb),0) FROM api_usage").fetchone()
