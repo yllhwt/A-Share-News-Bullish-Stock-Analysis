@@ -465,6 +465,148 @@ def set_cached_analysis(title: str, source: str, analysis: str,
 
 
 # ═══════════════════════════════════════════════════
+# 关键词当日缓存（同关键词当天复用，不重复调API）
+# ═══════════════════════════════════════════════════
+
+def _ensure_kw_cache_table(conn):
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS keyword_cache (
+            keyword TEXT NOT NULL,
+            date TEXT NOT NULL,
+            analysis TEXT NOT NULL,
+            tokens_in INTEGER DEFAULT 0,
+            tokens_out INTEGER DEFAULT 0,
+            hit_count INTEGER DEFAULT 1,
+            created_at TEXT NOT NULL,
+            PRIMARY KEY (keyword, date)
+        )
+    """)
+    conn.commit()
+
+
+def get_cached_keyword(keyword: str):
+    """查当日关键词缓存"""
+    today = datetime.now(TZ_BEIJING).strftime("%Y-%m-%d")
+    conn = _db()
+    _ensure_kw_cache_table(conn)
+    row = conn.execute(
+        "SELECT analysis, tokens_in, tokens_out, hit_count FROM keyword_cache WHERE keyword=? AND date=?",
+        (keyword, today)
+    ).fetchone()
+    if row:
+        conn.execute(
+            "UPDATE keyword_cache SET hit_count=hit_count+1 WHERE keyword=? AND date=?",
+            (keyword, today)
+        )
+        conn.commit()
+        conn.close()
+        return {"analysis": row["analysis"], "tokens_in": row["tokens_in"],
+                "tokens_out": row["tokens_out"], "hit_count": row["hit_count"] + 1}
+    conn.close()
+    return None
+
+
+def set_cached_keyword(keyword: str, analysis: str, tokens_in: int, tokens_out: int):
+    """存入当日关键词缓存"""
+    today = datetime.now(TZ_BEIJING).strftime("%Y-%m-%d")
+    now = datetime.now(TZ_BEIJING).isoformat()
+    conn = _db()
+    _ensure_kw_cache_table(conn)
+    conn.execute(
+        "INSERT OR REPLACE INTO keyword_cache (keyword, date, analysis, tokens_in, tokens_out, created_at) "
+        "VALUES (?,?,?,?,?,?)",
+        (keyword, today, analysis, tokens_in, tokens_out, now)
+    )
+    conn.commit()
+    conn.close()
+
+
+# ═══════════════════════════════════════════════════
+# 用户关键词（人工筛选核心概念，防新闻标题污染）
+# ═══════════════════════════════════════════════════
+
+def get_news_hash(title: str, source: str) -> str:
+    return hashlib.md5(f"{source}|{title}".encode()).hexdigest()[:16]
+
+
+def _ensure_keyword_table(conn):
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS news_keywords (
+            news_hash TEXT NOT NULL,
+            keyword TEXT NOT NULL,
+            count INTEGER DEFAULT 1,
+            PRIMARY KEY (news_hash, keyword)
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS news_analysis_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            news_hash TEXT NOT NULL,
+            date TEXT NOT NULL,
+            analyzed_at TEXT NOT NULL
+        )
+    """)
+    conn.commit()
+
+
+def get_top_keywords(title: str, source: str, limit: int = 3) -> list:
+    """获取某新闻被输入最多的前N个关键词，返回 [(keyword, count), ...]"""
+    nh = get_news_hash(title, source)
+    conn = _db()
+    _ensure_keyword_table(conn)
+    rows = conn.execute(
+        "SELECT keyword, count FROM news_keywords WHERE news_hash=? ORDER BY count DESC LIMIT ?",
+        (nh, limit)
+    ).fetchall()
+    conn.close()
+    return [(r["keyword"], r["count"]) for r in rows]
+
+
+def save_keyword(title: str, source: str, keyword: str):
+    """记录用户对某新闻输入的关键词"""
+    nh = get_news_hash(title, source)
+    conn = _db()
+    _ensure_keyword_table(conn)
+    conn.execute(
+        "INSERT INTO news_keywords (news_hash, keyword, count) VALUES (?,?,1) "
+        "ON CONFLICT(news_hash, keyword) DO UPDATE SET count=count+1",
+        (nh, keyword)
+    )
+    conn.commit()
+    conn.close()
+
+
+def get_news_analysis_count(title: str, source: str, date_str: str = None) -> int:
+    """某新闻当日被分析次数"""
+    nh = get_news_hash(title, source)
+    if date_str is None:
+        date_str = datetime.now(TZ_BEIJING).strftime("%Y-%m-%d")
+    conn = _db()
+    _ensure_keyword_table(conn)
+    row = conn.execute(
+        "SELECT COUNT(*) AS cnt FROM news_analysis_log WHERE news_hash=? AND date=?",
+        (nh, date_str)
+    ).fetchone()
+    conn.close()
+    return row["cnt"] if row else 0
+
+
+def log_news_analysis(title: str, source: str):
+    """记录一次分析"""
+    nh = get_news_hash(title, source)
+    today = datetime.now(TZ_BEIJING).strftime("%Y-%m-%d")
+    now = datetime.now(TZ_BEIJING).isoformat()
+    conn = _db()
+    _ensure_keyword_table(conn)
+    conn.execute(
+        "INSERT INTO news_analysis_log (news_hash, date, analyzed_at) VALUES (?,?,?)",
+        (nh, today, now)
+    )
+    conn.commit()
+    conn.close()
+
+
+# ═══════════════════════════════════════════════════
 # 初始化
 # ═══════════════════════════════════════════════════
 

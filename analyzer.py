@@ -19,7 +19,7 @@ from app_config import (
     DEBUG,
     COMPLIANCE_MODE,
 )
-from quota import get_cached_analysis, set_cached_analysis
+from quota import get_cached_analysis, set_cached_analysis, get_cached_keyword, set_cached_keyword
 
 # 懒加载客户端，避免 import 时因缺 key 崩溃
 _client = None
@@ -310,13 +310,14 @@ def search_company_context(title: str, max_results: int = 6) -> str:
 # 分析函数
 # ═══════════════════════════════════════════════════
 
-def analyze_news(news_item: dict, model: str = None) -> dict:
+def analyze_news(news_item: dict, model: str = None, search_keyword: str = None) -> dict:
     """
     分析单条新闻，返回结构化结果。
 
     参数:
-        news_item: 新闻条目 (来自 scraper.fetch_all_news)
-        model: 模型名称，默认用 config 中的 DEEPSEEK_MODEL
+        news_item: 新闻条目
+        model: 模型名称
+        search_keyword: 用户输入的核心关键词（用于搜索，替代新闻标题）
 
     返回:
         {
@@ -334,25 +335,33 @@ def analyze_news(news_item: dict, model: str = None) -> dict:
 
     title = news_item.get("title", "")
 
-    # ── 缓存检查 ──
+    # ── 关键词当日缓存（优先）──
+    if search_keyword:
+        cached = get_cached_keyword(search_keyword)
+        if cached:
+            print(f"  [关键词缓存命中] {search_keyword} (第{cached['hit_count']}次，0 token)")
+            return {
+                "news": news_item, "analysis": cached["analysis"],
+                "model": model, "tokens_in": cached["tokens_in"],
+                "tokens_out": cached["tokens_out"], "success": True, "error": None,
+            }
+
+    # ── 标题缓存 ──
     cached = get_cached_analysis(title, news_item.get("source", ""))
     if cached:
         print(f"  [缓存命中] {title[:40]}... (第{cached['hit_count']}次，0 token)")
         return {
-            "news": news_item,
-            "analysis": cached["analysis"],
-            "model": model,
-            "tokens_in": cached["tokens_in"],
-            "tokens_out": cached["tokens_out"],
-            "success": True,
-            "error": None,
+            "news": news_item, "analysis": cached["analysis"],
+            "model": model, "tokens_in": cached["tokens_in"],
+            "tokens_out": cached["tokens_out"], "success": True, "error": None,
         }
 
-    # ── 联网搜索 ──
+    # ── 联网搜索（优先用用户关键词）──
+    search_query = search_keyword.strip() if search_keyword else title
     search_context = ""
-    if title:
-        print(f"  [搜索] 正在联网搜索相关公司: {title[:40]}...")
-        search_context = search_company_context(title)
+    if search_query:
+        print(f"  [搜索] 正在联网搜索相关公司: {search_query[:40]}...")
+        search_context = search_company_context(search_query)
         if search_context:
             print(f"  [搜索] 已获取搜索结果")
         else:
@@ -407,6 +416,9 @@ def analyze_news(news_item: dict, model: str = None) -> dict:
         result["success"] = True
         set_cached_analysis(title, news_item.get("source", ""),
                            result["analysis"], result["tokens_in"], result["tokens_out"])
+        if search_keyword:
+            set_cached_keyword(search_keyword, result["analysis"],
+                              result["tokens_in"], result["tokens_out"])
 
     except Exception as e:
         result["error"] = str(e)

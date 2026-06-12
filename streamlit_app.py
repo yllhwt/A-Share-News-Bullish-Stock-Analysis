@@ -176,19 +176,58 @@ news_list = st.session_state.news_list
 if news_list:
     st.subheader(f"📋 今日新闻 ({len(news_list)} 条)")
 
+    from quota import get_news_analysis_count, get_top_keywords, save_keyword, log_news_analysis
+
+    # 构建选择状态和关键词
+    if "selected_news" not in st.session_state:
+        st.session_state.selected_news = []
+    if "news_keywords" not in st.session_state:
+        st.session_state.news_keywords = {}
+
     all_checked = st.checkbox("全选", value=False)
-    selected_items = []
 
     for i, n in enumerate(news_list):
+        count = get_news_analysis_count(n.get("title",""), n.get("source",""))
+        count_str = f" [{count}次]" if count > 0 else ""
+
         checked = st.checkbox(
-            f"{n.get('time','')} [{n['source']}] {n['title'][:80]}",
+            f"{n.get('time','')} [{n['source']}] {count_str} {n['title'][:70]}",
             value=all_checked,
             key=f"news_{i}",
         )
-        if checked:
-            selected_items.append(n)
 
+        if checked and n not in st.session_state.selected_news:
+            st.session_state.selected_news.append(n)
+        elif not checked and n in st.session_state.selected_news:
+            st.session_state.selected_news.remove(n)
+
+    selected_items = st.session_state.selected_news
     selected_count = len(selected_items)
+
+    # ── 关键词输入区 ──
+    if selected_items:
+        st.subheader("✏️ 核心关键词（1-6字，用于搜索，防原标题污染）")
+    for i, n in enumerate(selected_items):
+        top_kws = get_top_keywords(n.get("title",""), n.get("source",""), 3)
+        kw_options = [kw for kw, _ in top_kws]
+        default_kw = kw_options[0] if kw_options else ""
+
+        col_a, col_b = st.columns([3, 1])
+        with col_a:
+            kw = st.text_input(
+                f"{n['title'][:50]}",
+                value=st.session_state.news_keywords.get(n.get("title",""), default_kw),
+                max_chars=6,
+                placeholder="1-6字核心词，如：钼代钨",
+                key=f"kw_{i}",
+                label_visibility="collapsed",
+            )
+            if kw:
+                st.session_state.news_keywords[n.get("title","")] = kw
+        with col_b:
+            if kw_options:
+                st.caption(f"历史: {' / '.join(kw_options[:3])}")
+
     st.caption(f"已选择 {selected_count} 条 | 上限 {MAX_ANALYSIS_PER_DAY} | 剩余 {quota['remaining']}")
 
     over_quota = selected_count > quota["remaining"]
@@ -217,12 +256,18 @@ if news_list:
                 status_text.text(f"今日 API 消费已达上限 ¥{DAILY_COST_LIMIT}，明天再来！")
                 break
 
+            # 取用户输入的关键词
+            user_kw = st.session_state.news_keywords.get(item.get("title",""), "").strip()
+            if user_kw:
+                save_keyword(item.get("title",""), item.get("source",""), user_kw)
+
             status_text.text(f"正在分析 [{i+1}/{total}]: {item['title'][:60]}...")
-            result = analyze_news(item)
+            result = analyze_news(item, search_keyword=user_kw if user_kw else None)
             results.append(result)
 
             if result["success"]:
                 record_api_usage(user_key, result["tokens_in"], result["tokens_out"])
+                log_news_analysis(item.get("title",""), item.get("source",""))
 
             progress_bar.progress((i + 1) / total)
 
@@ -233,6 +278,7 @@ if news_list:
         st.success(f"分析完成: 成功 {success} · 失败 {total - success}")
         quota = get_quota(user_key)
         st.session_state.results = results
+        st.session_state.selected_news = []
         st.rerun()
 
 # ── 展示结果 ──
