@@ -230,7 +230,7 @@ if news_list:
                     st.rerun()
                 if kw:
                     st.session_state.news_keywords[n.get("title","")] = kw
-            with ck2:
+            with c2:
                 if st.button("📰原文", key=btn_key, help="按新闻原文分析（不提取关键词）"):
                     st.session_state[kw_key] = ""
                     st.session_state.news_keywords[n.get("title","")] = ""
