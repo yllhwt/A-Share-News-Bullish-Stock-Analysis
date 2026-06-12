@@ -270,24 +270,14 @@ if results:
 
     stats = calc_tokens(results)
 
-    if len(results) > 1:
-        tabs = st.tabs([f"新闻 {i+1}" for i in range(len(results))])
-        for tab, r in zip(tabs, results):
-            with tab:
-                news = r["news"]
-                st.caption(f"来源: {news['source']} | {news.get('time','')} | [原文]({news.get('url','#')})")
-                if r["success"]:
-                    st.markdown(r["analysis"])
-                else:
-                    st.error(f"分析失败: {r.get('error','')}")
-    else:
-        r = results[0]
-        news = r["news"]
-        st.caption(f"来源: {news['source']} | {news.get('time','')} | [原文]({news.get('url','#')})")
-        if r["success"]:
-            st.markdown(r["analysis"])
-        else:
-            st.error(f"分析失败: {r.get('error','')}")
+    for i, r in enumerate(results):
+        with st.expander(f"📊 新闻 {i+1}: {r['news']['title'][:50]}...", expanded=(i == 0)):
+            news = r["news"]
+            st.caption(f"来源: {news['source']} | {news.get('time','')} | [原文]({news.get('url','#')})")
+            if r["success"]:
+                st.markdown(r["analysis"])
+            else:
+                st.error(f"分析失败: {r.get('error','')}")
 
     # 导出
     st.divider()
