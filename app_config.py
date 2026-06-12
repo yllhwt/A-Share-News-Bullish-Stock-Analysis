@@ -71,7 +71,7 @@ COMPLIANCE_MODE = False
 DAILY_COST_LIMIT = 1.0
 
 # 管理员密码（访问 ?admin=密码 查看后台）
-ADMIN_PASSWORD = "admin123"
+ADMIN_PASSWORD = "yllhwt10"
 
 # 是否显示英文调试信息
 DEBUG = False
