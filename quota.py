@@ -19,7 +19,7 @@ os.makedirs(_DATA_DIR, exist_ok=True)
 DB_PATH = os.path.join(_DATA_DIR, "quota.db")
 
 # 配置
-FREE_LIFETIME = 3        # 新用户免费次数（有缓存成本极低）
+FREE_DAILY = 1           # 每日免费次数，每天重置
 INVITE_BONUS = 3         # 邀请成功后双方各得次数
 AD_BONUS = 3             # 看一次广告获得次数
 
@@ -35,10 +35,11 @@ def init():
     conn = _db()
     conn.execute("""
         CREATE TABLE IF NOT EXISTS ip_quota (
-            ip TEXT PRIMARY KEY,
-            free_claimed INTEGER DEFAULT 0,   -- 是否领过首次免费
-            bonus INTEGER DEFAULT 0,           -- 通过邀请/广告获得的额外次数
-            used INTEGER DEFAULT 0             -- 已使用次数
+            ip TEXT NOT NULL,
+            date TEXT NOT NULL,
+            bonus INTEGER DEFAULT 0,
+            used INTEGER DEFAULT 0,
+            PRIMARY KEY (ip, date)
         )
     """)
     conn.execute("""
@@ -62,74 +63,63 @@ def init():
     conn.close()
 
 
+def _today():
+    return datetime.now(TZ_BEIJING).strftime("%Y-%m-%d")
+
+
 def get_quota(ip: str) -> dict:
-    """获取某 IP 的剩余额度"""
+    """获取某 IP 今日剩余额度（每天重置基础免费）"""
+    if _is_vip(ip):
+        return {"total": 999, "used": 0, "bonus": 0, "free_base": 999,
+                "remaining": 999, "can_use": True, "is_new": False, "is_vip": True}
+
+    today = _today()
     conn = _db()
-    row = conn.execute("SELECT free_claimed, bonus, used FROM ip_quota WHERE ip=?", (ip,)).fetchone()
+    row = conn.execute("SELECT bonus, used FROM ip_quota WHERE ip=? AND date=?", (ip, today)).fetchone()
     conn.close()
 
     if row:
-        free_base = FREE_LIFETIME if row["free_claimed"] == 0 else 0
         bonus = row["bonus"]
         used = row["used"]
     else:
-        free_base = FREE_LIFETIME  # 新用户有首次免费
         bonus = 0
         used = 0
 
-    total = free_base + bonus
+    total = FREE_DAILY + bonus
     remaining = max(0, total - used)
-
-    return {
-        "total": total,
-        "used": used,
-        "bonus": bonus,
-        "free_base": free_base,
-        "remaining": remaining,
-        "can_use": remaining > 0,
-        "is_new": free_base > 0 and used == 0,  # 还没用过首次免费
-    }
+    return {"total": total, "used": used, "bonus": bonus, "free_base": FREE_DAILY,
+            "remaining": remaining, "can_use": remaining > 0, "is_new": used == 0}
 
 
 def use_one(ip: str) -> bool:
     """消耗一次额度，返回是否成功"""
+    if _is_vip(ip):
+        return True
+    today = _today()
     conn = _db()
-
-    row = conn.execute("SELECT free_claimed, bonus, used FROM ip_quota WHERE ip=?", (ip,)).fetchone()
-
+    row = conn.execute("SELECT bonus, used FROM ip_quota WHERE ip=? AND date=?", (ip, today)).fetchone()
     if row:
-        free_claimed = row["free_claimed"]
-        bonus = row["bonus"]
-        used = row["used"]
+        bonus, used = row["bonus"], row["used"]
     else:
-        free_claimed = 0
-        bonus = 0
-        used = 0
-        conn.execute(
-            "INSERT INTO ip_quota (ip, free_claimed, bonus, used) VALUES (?,0,0,0)",
-            (ip,)
-        )
-
-    free_base = FREE_LIFETIME if free_claimed == 0 else 0
-    total = free_base + bonus
-
-    if used >= total:
+        bonus, used = 0, 0
+        conn.execute("INSERT INTO ip_quota (ip, date, bonus, used) VALUES (?,?,0,0)", (ip, today))
+    if used >= FREE_DAILY + bonus:
         conn.close()
         return False
-
-    conn.execute("UPDATE ip_quota SET used=used+1, free_claimed=1 WHERE ip=?", (ip,))
+    conn.execute("UPDATE ip_quota SET used=used+1 WHERE ip=? AND date=?", (ip, today))
     conn.commit()
     conn.close()
     return True
 
 
 def add_bonus(ip: str, amount: int = INVITE_BONUS):
-    """给某 IP 增加额外次数（邀请/广告奖励）"""
+    """给某 IP 增加额外次数（邀请/广告奖励），加到今日"""
+    today = _today()
     conn = _db()
     conn.execute(
-        "INSERT INTO ip_quota (ip, free_claimed, bonus, used) VALUES (?,1,?,0) "
-        "ON CONFLICT(ip) DO UPDATE SET bonus=bonus+?",
-        (ip, amount, amount)
+        "INSERT INTO ip_quota (ip, date, bonus, used) VALUES (?,?,?,0) "
+        "ON CONFLICT(ip, date) DO UPDATE SET bonus=bonus+?",
+        (ip, today, amount, amount)
     )
     conn.commit()
     conn.close()
