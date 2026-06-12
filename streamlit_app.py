@@ -60,12 +60,10 @@ button[kind="primary"]:hover { background-color: #E55D00 !important; }
 
 # ─── 会话初始化 ───
 @st.cache_resource
-def _init_user_key():
-    import uuid
-    return str(uuid.uuid4())[:12]
-
 if "_client_id" not in st.session_state:
-    st.session_state._client_id = _init_user_key()
+    from streamlit.runtime.scriptrunner import get_script_run_ctx
+    ctx = get_script_run_ctx()
+    st.session_state._client_id = ctx.session_id if ctx else str(__import__('uuid').uuid4())[:12]
 if "news_list" not in st.session_state:
     st.session_state.news_list = []
 if "results" not in st.session_state:

@@ -45,9 +45,20 @@ def init():
     # 检查旧表结构，如有冲突自动迁移
     cur = conn.execute("PRAGMA table_info(ip_quota)")
     cols = [r[1] for r in cur.fetchall()]
-    if cols and ("date" not in cols or "fresh_lifetime" not in cols):
-        conn.execute("DROP TABLE ip_quota")
-        cols = []
+    # 增量迁移，不丢数据
+    if cols:
+        if "date" not in cols:
+            conn.execute("DROP TABLE ip_quota")
+            cols = []
+        else:
+            if "bonus" not in cols:
+                conn.execute("ALTER TABLE ip_quota ADD COLUMN bonus INTEGER DEFAULT 0")
+            if "cache_used" not in cols:
+                conn.execute("ALTER TABLE ip_quota ADD COLUMN cache_used INTEGER DEFAULT 0")
+            if "fresh_used" not in cols:
+                conn.execute("ALTER TABLE ip_quota ADD COLUMN fresh_used INTEGER DEFAULT 0")
+            if "fresh_lifetime" not in cols:
+                conn.execute("ALTER TABLE ip_quota ADD COLUMN fresh_lifetime INTEGER DEFAULT 0")
     if not cols:
         conn.execute("""
             CREATE TABLE ip_quota (
@@ -93,7 +104,6 @@ def get_quota(ip: str) -> dict:
 
     today = _today()
     conn = _db()
-    has_history = conn.execute("SELECT 1 FROM ip_quota WHERE ip=?", (ip,)).fetchone() is not None
     row = conn.execute("SELECT bonus, cache_used, fresh_used FROM ip_quota WHERE ip=? AND date=?", (ip, today)).fetchone()
     total_fresh = conn.execute("SELECT COALESCE(SUM(fresh_used), 0) FROM ip_quota WHERE ip=?", (ip,)).fetchone()[0]
     conn.close()
