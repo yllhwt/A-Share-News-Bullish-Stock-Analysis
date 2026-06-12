@@ -436,45 +436,45 @@ def ai_filter_news(news_list, model=None):
         data = json.loads(raw)
         keep_ids = data.get("keep", [])
 
+        dropped_ids = sorted(set(id_map.keys()) - set(keep_ids))
+        dropped_items = [id_map[i] for i in dropped_ids if i in id_map]
         filtered = [id_map[i] for i in keep_ids if i in id_map]
-        dropped = len(news_list) - len(filtered)
-        print(f"  [AI筛选] {len(news_list)} 条 → {len(filtered)} 条 "
-              f"(过滤 {dropped} 条) | token: {resp.usage.total_tokens}")
-
-        if DEBUG and dropped > 0:
-            dropped_ids = sorted(set(id_map.keys()) - set(keep_ids))
-            for i in dropped_ids[:5]:
-                print(f"    - [{i}] {id_map[i]['title'][:60]}")
-
-        return filtered
+        print(f"  [AI筛选] {len(news_list)} 条 → {len(filtered)} 保留 / {len(dropped_items)} 过滤 | token: {resp.usage.total_tokens}")
+        return filtered, dropped_items
 
     except Exception as e:
         print(f"  [!] AI 筛选异常，回退到关键词结果: {e}")
-        return news_list
+        return news_list, []
 
 
 def fetch_today_news(limit_per_source=30, ai_filter=False):
-    """快捷方法：抓取今日新闻（带缓存，8:00/12:30/17:00 定时刷新）"""
+    """快捷方法：抓取今日新闻（带缓存，8:00/12:30/17:00 定时刷新）。
+    如果 ai_filter=True，返回 (保留新闻, 被过滤新闻) 两个列表。"""
     from quota import get_cached_news, set_cached_news
     today = datetime.now(TZ_BEIJING).strftime("%Y-%m-%d")
 
     cached, refresh_point = get_cached_news(today)
     if cached is not None:
         print(f"[缓存] 新闻缓存有效 (刷新点: {refresh_point})，共 {len(cached)} 条")
+        if ai_filter:
+            return cached, []
         return cached
 
     print(f"[抓取] 缓存过期 (刷新点: {refresh_point})，重新抓取...")
     items = fetch_all_news(limit_per_source=limit_per_source, a_stock_filter=True)
     print(f"[抓取] 关键词过滤后共 {len(items)} 条")
 
+    dropped_items = []
     if ai_filter and items:
-        items = ai_filter_news(items)
+        items, dropped_items = ai_filter_news(items)
 
     if items:
         set_cached_news(items)
         print(f"[缓存] 已写入缓存")
 
     print(f"[OK] 最终 {len(items)} 条\n")
+    if ai_filter:
+        return items, dropped_items
     return items
 
 

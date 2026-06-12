@@ -127,12 +127,16 @@ if btn_clear:
 # ── 抓取 ──
 if btn_fetch:
     with st.spinner("正在抓取财经新闻..."):
-        raw = fetch_today_news(limit_per_source=max_news)
-        if use_ai_filter and raw:
-            raw = ai_filter_news(raw)
-        st.session_state.news_list = raw
+        if use_ai_filter:
+            kept, dropped = fetch_today_news(limit_per_source=max_news, ai_filter=True)
+            st.session_state.news_list = kept
+            st.session_state.dropped_news = dropped
+        else:
+            raw = fetch_today_news(limit_per_source=max_news)
+            st.session_state.news_list = raw
+            st.session_state.dropped_news = []
         st.session_state.results = []
-    st.success(f"抓取完成，共 {len(raw)} 条新闻")
+    st.success(f"抓取完成，共 {len(st.session_state.news_list)} 条新闻，过滤 {len(st.session_state.dropped_news)} 条")
     st.rerun()
 
 news_list = st.session_state.news_list
@@ -169,20 +173,30 @@ if news_list:
         if checked:
             top_kws = get_top_keywords(n.get("title",""), n.get("source",""), 3)
             kw_options = [kw for kw, _ in top_kws]
-            default_kw = kw_options[0] if kw_options else ""
-            hint = f" | 历史: {'/'.join(kw_options[:2])}" if kw_options else ""
+            hint = f"历史: {'/'.join(kw_options[:2])}" if kw_options else ""
+
+            # 初始化关键词 session state（防输入重置）
+            kw_key = f"kw_val_{i}"
+            if kw_key not in st.session_state:
+                st.session_state[kw_key] = kw_options[0] if kw_options else ""
 
             kw = st.text_input(
-                "核心关键词(1-6字)" + hint,
-                value=st.session_state.news_keywords.get(n.get("title",""), default_kw),
+                f"核心关键词(1-6字)  {hint}",
+                key=kw_key,
                 max_chars=6, placeholder="如：钼代钨",
-                key=f"kw_{i}",
             )
             if kw:
                 st.session_state.news_keywords[n.get("title","")] = kw
 
     selected_items = st.session_state.selected_news
     selected_count = len(selected_items)
+
+    # 被过滤的新闻（仅可读）
+    if st.session_state.get("dropped_news"):
+        with st.expander(f"🚫 已过滤新闻 ({len(st.session_state.dropped_news)} 条，单公司/利空/大盘播报等，不可分析)", expanded=False):
+            for n in st.session_state.dropped_news:
+                st.caption(f"[{n['source']}] {n['title'][:100]}")
+
     st.caption(f"已选择 {selected_count} 条 | 上限 {MAX_ANALYSIS_PER_DAY} | 剩余 {quota['remaining']}")
 
     over_quota = selected_count > quota["remaining"]
