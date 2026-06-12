@@ -163,7 +163,7 @@ if news_list:
         elif count <= 6: cname = "orange"
         else: cname = "red"
 
-        prefix = f"【今日已分析{count}次】" if count > 0 else ""
+        prefix = f"【今日已被分析{count}次】" if count > 0 else ""
         full_label = f"{prefix}{n.get('time','')} [{n['source']}] {n['title'][:68]}"
 
         ck, lk = st.columns([24, 1])
