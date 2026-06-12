@@ -170,22 +170,16 @@ if news_list:
             top_kws = get_top_keywords(n.get("title",""), n.get("source",""), 3)
             kw_options = [kw for kw, _ in top_kws]
             default_kw = kw_options[0] if kw_options else ""
+            hint = f" | 历史: {'/'.join(kw_options[:2])}" if kw_options else ""
 
-            col1, col2 = st.columns([1.5, 1])
-            with col1:
-                kw = st.text_input(
-                    "请输入你认为的核心关键词（1-6字）",
-                    value=st.session_state.news_keywords.get(n.get("title",""), default_kw),
-                    max_chars=6,
-                    placeholder="1-6字，如：钼代钨",
-                    key=f"kw_{i}",
-                )
-                if kw:
-                    st.session_state.news_keywords[n.get("title","")] = kw
-            with col2:
-                if kw_options:
-                    st.selectbox("历史", kw_options, index=0, key=f"kwsel_{i}",
-                                 on_change=None)
+            kw = st.text_input(
+                "核心关键词(1-6字)" + hint,
+                value=st.session_state.news_keywords.get(n.get("title",""), default_kw),
+                max_chars=6, placeholder="如：钼代钨",
+                key=f"kw_{i}",
+            )
+            if kw:
+                st.session_state.news_keywords[n.get("title","")] = kw
 
     selected_items = st.session_state.selected_news
     selected_count = len(selected_items)
