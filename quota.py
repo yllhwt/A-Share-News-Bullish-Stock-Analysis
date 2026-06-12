@@ -27,9 +27,10 @@ os.makedirs(_DATA_DIR, exist_ok=True)
 DB_PATH = os.path.join(_DATA_DIR, "quota.db")
 
 # 配置
-FREE_LIFETIME = 3        # 每日免费看缓存结果次数，每天重置
-INVITE_BONUS = 1         # 邀请成功后双方各得次数
-AD_BONUS = 2             # 看一次广告获得次数
+FREE_CACHE = 3        # 每日免费看已有缓存结果次数
+FREE_FRESH = 0        # 每日免费全新分析次数（0=只给缓存）
+INVITE_BONUS = 1      # 邀请后双方各得全新分析次数
+AD_BONUS = 2          # 看广告得全新分析次数
 
 def _db():
     conn = sqlite3.connect(DB_PATH)
@@ -44,7 +45,7 @@ def init():
     # 检查旧表结构，如有冲突自动迁移
     cur = conn.execute("PRAGMA table_info(ip_quota)")
     cols = [r[1] for r in cur.fetchall()]
-    if cols and "date" not in cols:
+    if cols and ("date" not in cols or "cache_used" not in cols):
         conn.execute("DROP TABLE ip_quota")
         cols = []
     if not cols:
@@ -53,7 +54,8 @@ def init():
                 ip TEXT NOT NULL,
                 date TEXT NOT NULL,
                 bonus INTEGER DEFAULT 0,
-                used INTEGER DEFAULT 0,
+                cache_used INTEGER DEFAULT 0,
+                fresh_used INTEGER DEFAULT 0,
                 PRIMARY KEY (ip, date)
             )
         """)
@@ -85,43 +87,49 @@ def _today():
 def get_quota(ip: str) -> dict:
     """获取某 IP 今日剩余额度（每天重置基础免费）"""
     if _is_vip(ip):
-        return {"total": 999, "used": 0, "bonus": 0, "free_base": 999,
-                "remaining": 999, "can_use": True, "is_new": False, "is_vip": True}
+        return {"remaining": 999, "cache_rem": 999, "fresh_rem": 999,
+                "bonus": 0, "can_use": True, "is_new": False, "is_vip": True}
 
     today = _today()
     conn = _db()
-    row = conn.execute("SELECT bonus, used FROM ip_quota WHERE ip=? AND date=?", (ip, today)).fetchone()
+    row = conn.execute("SELECT bonus, cache_used, fresh_used FROM ip_quota WHERE ip=? AND date=?", (ip, today)).fetchone()
     conn.close()
 
-    if row:
-        bonus = row["bonus"]
-        used = row["used"]
-    else:
-        bonus = 0
-        used = 0
+    bonus = row["bonus"] if row else 0
+    cache_used = row["cache_used"] if row else 0
+    fresh_used = row["fresh_used"] if row else 0
 
-    total = FREE_LIFETIME + bonus
-    remaining = max(0, total - used)
-    return {"total": total, "used": used, "bonus": bonus, "free_base": FREE_LIFETIME,
-            "remaining": remaining, "can_use": remaining > 0, "is_new": used == 0}
+    cache_rem = max(0, FREE_CACHE - cache_used)
+    fresh_rem = max(0, FREE_FRESH + bonus - fresh_used)
+    return {"remaining": cache_rem + fresh_rem, "cache_rem": cache_rem,
+            "fresh_rem": fresh_rem, "bonus": bonus,
+            "can_use": cache_rem + fresh_rem > 0,
+            "is_new": cache_used == 0 and fresh_used == 0}
 
 
-def use_one(ip: str) -> bool:
-    """消耗一次额度，返回是否成功"""
+def use_one(ip: str, fresh: bool = False) -> bool:
+    """消耗一次额度（fresh=True=全新分析，False=看缓存），返回是否成功"""
     if _is_vip(ip):
         return True
     today = _today()
     conn = _db()
-    row = conn.execute("SELECT bonus, used FROM ip_quota WHERE ip=? AND date=?", (ip, today)).fetchone()
-    if row:
-        bonus, used = row["bonus"], row["used"]
+    row = conn.execute("SELECT bonus, cache_used, fresh_used FROM ip_quota WHERE ip=? AND date=?", (ip, today)).fetchone()
+    if not row:
+        conn.execute("INSERT INTO ip_quota (ip, date, bonus, cache_used, fresh_used) VALUES (?,?,0,0,0)", (ip, today))
+        bonus, cache_used, fresh_used = 0, 0, 0
     else:
-        bonus, used = 0, 0
-        conn.execute("INSERT INTO ip_quota (ip, date, bonus, used) VALUES (?,?,0,0)", (ip, today))
-    if used >= FREE_LIFETIME + bonus:
-        conn.close()
-        return False
-    conn.execute("UPDATE ip_quota SET used=used+1 WHERE ip=? AND date=?", (ip, today))
+        bonus, cache_used, fresh_used = row["bonus"], row["cache_used"], row["fresh_used"]
+
+    if fresh:
+        if fresh_used >= FREE_FRESH + bonus:
+            conn.close()
+            return False
+        conn.execute("UPDATE ip_quota SET fresh_used=fresh_used+1 WHERE ip=? AND date=?", (ip, today))
+    else:
+        if cache_used >= FREE_CACHE:
+            conn.close()
+            return False
+        conn.execute("UPDATE ip_quota SET cache_used=cache_used+1 WHERE ip=? AND date=?", (ip, today))
     conn.commit()
     conn.close()
     return True

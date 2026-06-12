@@ -20,8 +20,8 @@ from scraper import fetch_today_news, ai_filter_news
 from analyzer import analyze_multiple, calc_tokens, analyze_news
 from quota import (
     get_quota, use_one, create_invite_code, claim_invite_code,
-    get_my_invite_link, record_ad_view, FREE_LIFETIME, INVITE_BONUS, AD_BONUS,
-    record_api_usage, get_daily_cost, get_admin_stats,
+    get_my_invite_link, record_ad_view, FREE_CACHE, FREE_FRESH, INVITE_BONUS, AD_BONUS,
+    record_api_usage, get_daily_cost, get_admin_stats, get_cached_analysis,
 )
 from datetime import datetime, timezone, timedelta
 
@@ -100,16 +100,14 @@ with st.sidebar:
 
     st.divider()
     st.subheader("🎯 免费额度")
-    col_a, col_b = st.columns(2)
-    with col_a:
-        st.metric("剩余次数", quota["remaining"])
-    with col_b:
-        st.metric("累计已用", quota["used"])
     if quota.get("is_vip"):
         st.success("👑 VIP 无限")
-    elif quota["is_new"]:
-        st.success(f"🎁 每日免费看已有分析结果 {FREE_LIFETIME} 次")
-    st.caption(f"全新分析次数 +{quota['bonus']} 次 | 分享/看广告可获取")
+    else:
+        st.metric("看缓存剩余", quota["cache_rem"])
+        st.metric("全新分析剩余", quota["fresh_rem"])
+        if quota["is_new"]:
+            st.success(f"🎁 每日免费看缓存 {FREE_CACHE} 次")
+    st.caption(f"分享/看广告得全新分析次数 | 现有 +{quota['bonus']} 次")
 
     # ── 打赏 ──
     st.divider()
@@ -267,8 +265,14 @@ if news_list:
         total = selected_count
 
         for i, item in enumerate(selected_items):
-            if not admin_on and not use_one(user_key):
-                status_text.text(f"用户额度用完！已分析 {i}/{total}")
+            # 判断是否走缓存
+            is_cached = get_cached_analysis(item.get("title",""), item.get("source","")) is not None
+
+            if not admin_on and not use_one(user_key, fresh=not is_cached):
+                if is_cached:
+                    status_text.text(f"缓存免费次数用完！已分析 {i}/{total}")
+                else:
+                    status_text.text(f"全新分析次数用完！看广告或分享获取")
                 break
 
             if not admin_on and get_daily_cost() >= DAILY_COST_LIMIT:
