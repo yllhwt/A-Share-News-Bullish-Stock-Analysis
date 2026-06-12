@@ -160,10 +160,12 @@ if news_list:
 
         ck, lk = st.columns([12, 1])
         with ck:
-            label = f"{n.get('time','')} [{n['source']}] {n['title'][:70]}"
-            if count > 0:
-                label += f"  🔴{count}次"
+            label = f"{n.get('time','')} {n['title'][:70]}"
             checked = st.checkbox(label, value=all_checked, key=f"news_{i}")
+            if count > 0:
+                st.markdown(f":red[**{n['source']}（今日已被分析{count}次）**]")
+            else:
+                st.caption(f"{n['source']}")
         with lk:
             if url:
                 st.link_button("🔗", url, help="查看原文")
