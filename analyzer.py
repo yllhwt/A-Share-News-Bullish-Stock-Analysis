@@ -200,7 +200,7 @@ USER_PROMPT_KEYWORD = """请分析以下产业关键词相关的A股上市公司
 # 联网搜索（免费，无 API Key）
 # ═══════════════════════════════════════════════════
 
-def search_company_context(title: str, max_results: int = 6) -> str:
+def search_company_context(title: str, max_results: int = 12) -> str:
     """
     根据新闻标题搜索相关A股上市公司，返回搜索结果文本。
     用于给 LLM 分析提供实时公司信息，弥补 API 版无联网搜索的短板。
@@ -227,7 +227,7 @@ def search_company_context(title: str, max_results: int = 6) -> str:
         with DDGS() as ddgs:
             for sq in searches:
                 try:
-                    results = list(ddgs.text(sq, max_results=max_results // 2))
+                    results = list(ddgs.text(sq, max_results=max_results))
                     for r in results:
                         body = r.get("body", "")
                         title_r = r.get("title", "")
@@ -411,7 +411,7 @@ def analyze_news(news_item: dict, model: str = None, search_keyword: str = None)
                 {"role": "system", "content": _get_system_prompt()},
                 {"role": "user", "content": prompt},
             ],
-            temperature=0.3,
+            temperature=0.5,
             max_tokens=6144,
         )
         # 豆包 API 内置联网搜索，跳过外部搜索直接调
