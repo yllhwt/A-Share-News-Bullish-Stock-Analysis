@@ -210,7 +210,7 @@ if news_list:
             col1, col2 = st.columns([1.5, 1])
             with col1:
                 kw = st.text_input(
-                    "核心关键词",
+                    "请输入你认为的核心关键词（1-6字）",
                     value=st.session_state.news_keywords.get(n.get("title",""), default_kw),
                     max_chars=6,
                     placeholder="1-6字，如：钼代钨",
