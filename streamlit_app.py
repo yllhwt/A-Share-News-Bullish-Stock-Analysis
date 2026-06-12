@@ -314,33 +314,37 @@ if results:
             else:
                 st.error(f"分析失败: {r.get('error','')}")
 
-    # ── 二次分析：DeepSeek 价格预估 ──
+    # ── 一键复制去 AI 做价格分析 ──
     st.divider()
-    st.subheader("🔍 想让 AI 帮你估价格？")
-    st.caption("复制下方模板 → 打开 DeepSeek 或豆包 → 粘贴 → 获得价格分析")
-    c1, c2 = st.columns(2)
-    c1.link_button("🚀 去 DeepSeek", "https://chat.deepseek.com/", use_container_width=True)
-    c2.link_button("🚀 去豆包", "https://www.doubao.com/", use_container_width=True)
+    st.subheader("🔍 一键复制 → 去 AI 做价格分析")
 
-    prompt_template = """你是A股产业链分析师。请联网搜索后，对以下公司列表做价格分析。
-按产业链分组输出表格：
+    full_copy = ""
+    for i, r in enumerate(results):
+        if r["success"]:
+            kw = st.session_state.news_keywords.get(r['news'].get('title',''), '')
+            if kw:
+                full_copy += f"关键词：{kw}\n"
+            full_copy += f"新闻：{r['news']['title']}\n\n"
+            full_copy += r["analysis"]
+            full_copy += "\n\n"
+
+    full_copy += """---
+以上是公司列表，请联网搜索后做价格分析，按产业链分组输出表格：
 
 | 代码 | 名称 | 现价 | 保守目标价 | 中性目标价 | 乐观目标价 | 价格来源 |
 
 规则：
-- 现价取最新收盘价
-- 保守/中性/乐观基于行业估值+公司基本面+近期催化
-- 价格来源标注券商名称（如"中信"）或"AI综合估算"
-- 禁止编造，搜不到的写"暂无"
+- 现价取最新收盘价，保守/中性/乐观基于行业估值+基本面+近期催化
+- 价格来源标注券商名或"AI综合估算"
+- 禁止编造，搜不到的诚实写"暂无"
+- 客观、简洁，每家公司一行"""
 
----
-"""
-    for i, r in enumerate(results):
-        if r["success"]:
-            prompt_template += f"\n## 新闻{i+1}：{r['news']['title']}\n{r['analysis']}\n"
+    st.text_area("📋 全选复制后去下方AI平台粘贴", full_copy, height=250)
+    c1, c2 = st.columns(2)
+    c1.link_button("🚀 去 DeepSeek 粘贴", "https://chat.deepseek.com/", use_container_width=True)
+    c2.link_button("🚀 去豆包粘贴", "https://www.doubao.com/", use_container_width=True)
+    st.caption("👆 全选→复制→打开 AI 平台→粘贴→获得价格分析。本平台不提供价格预测。")
 
-    st.code(prompt_template, language=None)
-    st.caption("👆 全选复制，粘贴到 DeepSeek 对话框，AI 帮你做价格分析。本平台不提供价格预测。")
 
 else:
     st.info("👆 点击「抓取新闻」开始")
