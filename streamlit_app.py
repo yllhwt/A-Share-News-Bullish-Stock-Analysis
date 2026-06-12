@@ -197,6 +197,8 @@ if news_list:
         title_text = n['title'][:70]
 
         checked = st.checkbox(f"{label} {title_text}", value=False, key=f"news_{i}")
+        if checked and url:
+            st.caption(f"[📰原文]({url})")
 
         if checked and n not in st.session_state.selected_news:
             st.session_state.selected_news.append(n)
@@ -214,12 +216,9 @@ if news_list:
             if kw_key not in st.session_state:
                 st.session_state[kw_key] = kw_options[0] if kw_options else ""
 
-            # 原文链接 + 关键词输入同行
-            c0, c1, c2 = st.columns([1.5, 2, 1])
-            with c0:
-                if url:
-                    st.caption(f"[📰原文]({url})")
-            with c1:
+            # 关键词输入
+            ck1, ck2 = st.columns([2, 1])
+            with ck1:
                 kw = st.text_input(
                     f"核心关键词（1-6字，默认取历史最多，可改）  {hint}",
                     key=kw_key,
@@ -230,7 +229,7 @@ if news_list:
                     st.rerun()
                 if kw:
                     st.session_state.news_keywords[n.get("title","")] = kw
-            with c2:
+            with ck2:
                 if st.button("📰原文", key=btn_key, help="按新闻原文分析（不提取关键词）"):
                     st.session_state[kw_key] = ""
                     st.session_state.news_keywords[n.get("title","")] = ""
