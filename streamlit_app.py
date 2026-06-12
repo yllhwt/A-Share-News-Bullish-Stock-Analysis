@@ -159,7 +159,7 @@ if news_list:
         # 热度渐变色：0=绿 → 5=灰 → 10+=红
         if count == 0: cname = "green"
         elif count <= 2: cname = "green"
-        elif count <= 4: cname = "gray"
+        elif count <= 4: cname = "yellow"
         elif count <= 6: cname = "orange"
         else: cname = "red"
 
