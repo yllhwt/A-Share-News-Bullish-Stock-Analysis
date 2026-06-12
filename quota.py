@@ -19,7 +19,7 @@ os.makedirs(_DATA_DIR, exist_ok=True)
 DB_PATH = os.path.join(_DATA_DIR, "quota.db")
 
 # 配置
-FREE_DAILY = 1           # 每日免费次数，每天重置
+FREE_LIFETIME = 1        # 每日免费次数，每天重置
 INVITE_BONUS = 3         # 邀请成功后双方各得次数
 AD_BONUS = 3             # 看一次广告获得次数
 
@@ -85,9 +85,9 @@ def get_quota(ip: str) -> dict:
         bonus = 0
         used = 0
 
-    total = FREE_DAILY + bonus
+    total = FREE_LIFETIME + bonus
     remaining = max(0, total - used)
-    return {"total": total, "used": used, "bonus": bonus, "free_base": FREE_DAILY,
+    return {"total": total, "used": used, "bonus": bonus, "free_base": FREE_LIFETIME,
             "remaining": remaining, "can_use": remaining > 0, "is_new": used == 0}
 
 
@@ -103,7 +103,7 @@ def use_one(ip: str) -> bool:
     else:
         bonus, used = 0, 0
         conn.execute("INSERT INTO ip_quota (ip, date, bonus, used) VALUES (?,?,0,0)", (ip, today))
-    if used >= FREE_DAILY + bonus:
+    if used >= FREE_LIFETIME + bonus:
         conn.close()
         return False
     conn.execute("UPDATE ip_quota SET used=used+1 WHERE ip=? AND date=?", (ip, today))

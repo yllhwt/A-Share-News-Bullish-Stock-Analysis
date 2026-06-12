@@ -20,7 +20,7 @@ from scraper import fetch_today_news, ai_filter_news
 from analyzer import analyze_multiple, calc_tokens, analyze_news
 from quota import (
     get_quota, use_one, create_invite_code, claim_invite_code,
-    get_my_invite_link, record_ad_view, FREE_DAILY, INVITE_BONUS, AD_BONUS,
+    get_my_invite_link, record_ad_view, FREE_LIFETIME, INVITE_BONUS, AD_BONUS,
     record_api_usage, get_daily_cost, get_admin_stats,
 )
 from datetime import datetime, timezone, timedelta
@@ -109,7 +109,7 @@ with st.sidebar:
     if quota.get("is_vip"):
         st.success("👑 VIP 无限")
     elif quota["is_new"]:
-        st.success(f"🎁 每日免费 {FREE_DAILY} 次")
+        st.success(f"🎁 每日免费 {FREE_LIFETIME} 次")
     st.caption(f"邀请奖励 +{quota['bonus']} 次 | 分享/看广告获取更多")
 
     # ── 打赏 ──
