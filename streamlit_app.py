@@ -28,7 +28,7 @@ from datetime import datetime, timezone, timedelta
 TZ_BEIJING = timezone(timedelta(hours=8))
 
 st.set_page_config(
-    page_title="A股利好新闻AI大模型分析（豆包版）",
+    page_title="A股利好新闻AI大模型分析系统-豆包版",
     page_icon="📰",
     layout="centered",
     initial_sidebar_state="collapsed",
@@ -96,7 +96,6 @@ invite_link = "分享功能开发中"
 with st.sidebar:
     st.title("📰 设置")
 
-    use_ai_filter = st.checkbox("AI 预筛", value=True)
     max_news = st.slider("每源抓取条数", 10, 50, 30)
 
     st.divider()
@@ -136,7 +135,7 @@ with st.sidebar:
 # 主页面
 # ═══════════════════════════════════════════════════
 
-st.title("📰 A股利好新闻AI大模型分析（豆包版）系统")
+st.markdown("# 📰 A股利好新闻AI大模型分析系统<br><small>——（豆包版）</small>", unsafe_allow_html=True)
 st.caption("抓取财经新闻 → 筛选 → AI 分析利好 + 映射上市公司 + 预期价格")
 
 col1, col2, col3 = st.columns([1, 1, 4])
@@ -153,16 +152,11 @@ if btn_clear:
 # ── 抓取 ──
 if btn_fetch:
     with st.spinner("正在抓取财经新闻..."):
-        if use_ai_filter:
-            kept, dropped = fetch_today_news(limit_per_source=max_news, ai_filter=True)
-            st.session_state.news_list = kept
-            st.session_state.dropped_news = dropped
-        else:
-            raw = fetch_today_news(limit_per_source=max_news)
-            st.session_state.news_list = raw
-            st.session_state.dropped_news = []
+        kept, dropped = fetch_today_news(limit_per_source=max_news, ai_filter=True)
+        st.session_state.news_list = kept
+        st.session_state.dropped_news = dropped
         st.session_state.results = []
-    st.success(f"抓取完成，共 {len(st.session_state.news_list)} 条新闻，过滤 {len(st.session_state.dropped_news)} 条")
+    st.success(f"抓取完成，共 {len(kept)} 条新闻，过滤 {len(dropped)} 条")
     st.rerun()
 
 news_list = st.session_state.news_list
@@ -321,7 +315,7 @@ if results:
     # 导出
     st.divider()
     date_str = datetime.now(TZ_BEIJING).strftime("%Y-%m-%d")
-    report_lines = [f"# A股利好新闻AI大模型分析（豆包版）报告 — {date_str}\n"]
+    report_lines = [f"# A股利好新闻AI大模型分析系统——（豆包版）报告 — {date_str}\n"]
     report_lines.append(f"> 模型: {DEEPSEEK_MODEL}\n\n---\n")
     for i, r in enumerate(results, 1):
         news = r["news"]
