@@ -12,6 +12,14 @@ import hashlib
 import secrets
 from datetime import datetime, timezone, timedelta
 
+try:
+    from app_config import VIP_FPS
+except ImportError:
+    VIP_FPS = []
+
+def _is_vip(ip: str) -> bool:
+    return ip in VIP_FPS
+
 TZ_BEIJING = timezone(timedelta(hours=8))
 # HF Spaces 用 /data 持久化，本地用当前目录
 _DATA_DIR = os.environ.get("DATA_DIR", os.path.dirname(os.path.abspath(__file__)))
