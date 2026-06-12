@@ -201,32 +201,23 @@ if news_list:
         elif not checked and n in st.session_state.selected_news:
             st.session_state.selected_news.remove(n)
 
-    selected_items = st.session_state.selected_news
-    selected_count = len(selected_items)
+        # 勾选后直接在新闻下方弹出关键词输入
+        if checked:
+            top_kws = get_top_keywords(n.get("title",""), n.get("source",""), 3)
+            kw_options = [kw for kw, _ in top_kws]
+            default_kw = kw_options[0] if kw_options else ""
 
-    # ── 关键词输入区 ──
-    if selected_items:
-        st.subheader("✏️ 核心关键词（1-6字，用于搜索，防原标题污染）")
-    for i, n in enumerate(selected_items):
-        top_kws = get_top_keywords(n.get("title",""), n.get("source",""), 3)
-        kw_options = [kw for kw, _ in top_kws]
-        default_kw = kw_options[0] if kw_options else ""
-
-        col_a, col_b = st.columns([3, 1])
-        with col_a:
             kw = st.text_input(
-                f"{n['title'][:50]}",
+                "请输入你认为的核心关键词（1-6字）",
                 value=st.session_state.news_keywords.get(n.get("title",""), default_kw),
                 max_chars=6,
-                placeholder="1-6字核心词，如：钼代钨",
+                placeholder="如：钼代钨",
                 key=f"kw_{i}",
-                label_visibility="collapsed",
             )
             if kw:
                 st.session_state.news_keywords[n.get("title","")] = kw
-        with col_b:
             if kw_options:
-                st.caption(f"历史: {' / '.join(kw_options[:3])}")
+                st.caption(f"别人输过: {' / '.join(kw_options[:3])}")
 
     st.caption(f"已选择 {selected_count} 条 | 上限 {MAX_ANALYSIS_PER_DAY} | 剩余 {quota['remaining']}")
 
