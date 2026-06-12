@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-A股利好新闻AI大模型分析（豆包版）系统 — Hugging Face Spaces 版
+A股利好新闻AI大模型分析（价格去问AI我不担责版）系统 — Hugging Face Spaces 版
 """
 import os, sys
 import streamlit as st
@@ -28,7 +28,7 @@ from datetime import datetime, timezone, timedelta
 TZ_BEIJING = timezone(timedelta(hours=8))
 
 st.set_page_config(
-    page_title="A股利好新闻AI大模型分析系统-豆包版",
+    page_title="A股利好新闻AI大模型分析",
     page_icon="📰",
     layout="centered",
     initial_sidebar_state="collapsed",
@@ -137,7 +137,7 @@ with st.sidebar:
 # 主页面
 # ═══════════════════════════════════════════════════
 
-st.markdown("# 📰 A股利好新闻AI大模型分析系统<br><small>——（豆包版）</small>", unsafe_allow_html=True)
+st.markdown("# 📰 A股利好新闻AI大模型分析系统<br><small>——（价格去问AI我不担责版）</small>", unsafe_allow_html=True)
 st.caption("抓取财经新闻 → 筛选 → AI 分析利好 + 映射上市公司 + 预期价格")
 
 col1, col2, col3 = st.columns([1, 1, 4])
@@ -317,8 +317,10 @@ if results:
     # ── 二次分析：DeepSeek 价格预估 ──
     st.divider()
     st.subheader("🔍 想让 AI 帮你估价格？")
-    st.caption("复制下方模板 → 打开 DeepSeek → 粘贴 → 获得现价/保守/中性/乐观价")
-    st.link_button("🚀 打开 DeepSeek", "https://chat.deepseek.com/")
+    st.caption("复制下方模板 → 打开 DeepSeek 或豆包 → 粘贴 → 获得价格分析")
+    c1, c2 = st.columns(2)
+    c1.link_button("🚀 去 DeepSeek", "https://chat.deepseek.com/", use_container_width=True)
+    c2.link_button("🚀 去豆包", "https://www.doubao.com/", use_container_width=True)
 
     prompt_template = """你是A股产业链分析师。请联网搜索后，对以下公司列表做价格分析。
 按产业链分组输出表格：
