@@ -153,6 +153,7 @@ with col2:
 if btn_clear:
     st.session_state.news_list = []
     st.session_state.results = []
+    st.session_state.dropped_news = []
     st.rerun()
 
 # ── 抓取 ──
@@ -160,7 +161,9 @@ if btn_fetch:
     with st.spinner("正在抓取财经新闻..."):
         kept, dropped = fetch_today_news(limit_per_source=30, ai_filter=True)
         st.session_state.news_list = kept
-        st.session_state.dropped_news = dropped
+        # 只在有实际过滤结果时更新，避免缓存命中空列表覆盖旧数据
+        if dropped:
+            st.session_state.dropped_news = dropped
         st.session_state.results = []
     st.success(f"抓取完成，共 {len(kept)} 条新闻，过滤 {len(dropped)} 条")
     st.rerun()
